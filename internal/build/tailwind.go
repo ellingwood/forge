@@ -11,9 +11,13 @@ import (
 	"strings"
 )
 
+// TailwindVersion is the version of the Tailwind CSS standalone CLI to use.
+const TailwindVersion = "3.4.17"
+
 // TailwindBuilder manages the Tailwind CSS standalone CLI binary.
 type TailwindBuilder struct {
-	BinDir string // directory where the binary is cached (default: ~/.forge/bin/)
+	BinDir     string // directory where the binary is cached (default: ~/.forge/bin/)
+	ConfigPath string // optional path to tailwind.config.js; passed as --config if set
 }
 
 // BinaryName returns the filename of the tailwindcss binary for the current
@@ -140,6 +144,9 @@ func (tb *TailwindBuilder) Build(input, output string, contentPaths []string) er
 		"--content", strings.Join(contentPaths, ","),
 		"--minify",
 	}
+	if tb.ConfigPath != "" {
+		args = append(args, "--config", tb.ConfigPath)
+	}
 
 	cmd := exec.Command(binPath, args...)
 	cmd.Stdout = os.Stdout
@@ -161,6 +168,9 @@ func (tb *TailwindBuilder) Watch(input, output string, contentPaths []string) (c
 		"-o", output,
 		"--content", strings.Join(contentPaths, ","),
 		"--watch",
+	}
+	if tb.ConfigPath != "" {
+		args = append(args, "--config", tb.ConfigPath)
 	}
 
 	cmd := exec.Command(binPath, args...)

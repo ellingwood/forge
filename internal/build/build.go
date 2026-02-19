@@ -72,7 +72,8 @@ func NewBuilder(cfg *config.SiteConfig, opts BuildOptions) *Builder {
 //  8. Render pages to HTML in parallel
 //  9. Write HTML files
 //  10. Copy static files
-//  11. Copy page bundle assets
+//  11. Build Tailwind CSS
+//  12. Copy page bundle assets
 func (b *Builder) Build() (*BuildResult, error) {
 	start := time.Now()
 	result := &BuildResult{}
@@ -301,6 +302,33 @@ func (b *Builder) Build() (*BuildResult, error) {
 			return nil, fmt.Errorf("copying site static files: %w", err)
 		}
 		result.FilesCopied += copied
+	}
+
+	// Step 11: Build Tailwind CSS.
+	cssInput := filepath.Join(themePath, "static", "css", "globals.css")
+	if _, err := os.Stat(cssInput); err == nil {
+		cssOutput := filepath.Join(outputDir, "css", "style.css")
+		contentPaths := []string{
+			filepath.Join(themePath, "layouts", "**", "*.html"),
+			filepath.Join(projectRoot, "layouts", "**", "*.html"),
+			filepath.Join(contentDir, "**", "*.md"),
+		}
+		tb := &TailwindBuilder{}
+		twConfig := filepath.Join(themePath, "tailwind.config.js")
+		if _, err := os.Stat(twConfig); err == nil {
+			tb.ConfigPath = twConfig
+		}
+		if _, binErr := tb.EnsureBinary(TailwindVersion); binErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not download Tailwind CSS binary: %v (skipping CSS compilation)\n", binErr)
+		} else {
+			if err := os.MkdirAll(filepath.Dir(cssOutput), 0o755); err != nil {
+				return nil, fmt.Errorf("creating CSS output directory: %w", err)
+			}
+			if err := tb.Build(cssInput, cssOutput, contentPaths); err != nil {
+				return nil, fmt.Errorf("building Tailwind CSS: %w", err)
+			}
+			result.StaticFiles++
+		}
 	}
 
 	// Step 12: Copy page bundle assets.
