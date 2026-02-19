@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/aellingwood/forge/internal/scaffold"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +18,11 @@ var newSiteCmd = &cobra.Command{
 	Short: "Create a new site",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Printf("Creating new site: %s\n", args[0])
+		name := args[0]
+		if err := scaffold.NewSite(name); err != nil {
+			return err
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "Site created: %s/\n", name)
 		return nil
 	},
 }
@@ -27,7 +32,11 @@ var newPostCmd = &cobra.Command{
 	Short: "Create a new post",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Printf("Creating new post: %s\n", args[0])
+		title := args[0]
+		if err := scaffold.NewPost(title); err != nil {
+			return err
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "Post created: %s\n", scaffold.CreatedPostPath(title))
 		return nil
 	},
 }
@@ -37,7 +46,11 @@ var newPageCmd = &cobra.Command{
 	Short: "Create a new page",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Printf("Creating new page: %s\n", args[0])
+		title := args[0]
+		if err := scaffold.NewPage(title); err != nil {
+			return err
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "Page created: %s\n", scaffold.CreatedPagePath(title))
 		return nil
 	},
 }
@@ -47,7 +60,11 @@ var newProjectCmd = &cobra.Command{
 	Short: "Create a new project",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Printf("Creating new project: %s\n", args[0])
+		title := args[0]
+		if err := scaffold.NewProject(title); err != nil {
+			return err
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "Project created: %s\n", scaffold.CreatedProjectPath(title))
 		return nil
 	},
 }
