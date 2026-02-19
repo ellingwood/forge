@@ -3,7 +3,7 @@
     <a href="/" class="text-lg font-bold">{{ .Site.Title }}</a>
     <nav class="hidden md:flex items-center gap-6 text-sm" aria-label="Main navigation">
       {{ range .Site.Menu }}
-      <a href="{{ .URL }}" class="text-muted-foreground transition-colors hover:text-foreground"{{ if eq $.Page.URL .URL }} aria-current="page"{{ end }}>{{ .Name }}</a>
+      <a href="{{ .URL }}" class="text-muted-foreground transition-colors hover:text-foreground"{{ if eq $.URL .URL }} aria-current="page"{{ end }}>{{ .Name }}</a>
       {{ end }}
     </nav>
     <div class="flex items-center gap-2">
@@ -21,7 +21,7 @@
   <nav id="mobile-nav" class="hidden md:hidden border-t border-border" aria-label="Mobile navigation" aria-hidden="true">
     <div class="mx-auto max-w-4xl px-4 py-4 flex flex-col gap-3">
       {{ range .Site.Menu }}
-      <a href="{{ .URL }}" class="text-muted-foreground transition-colors hover:text-foreground text-sm"{{ if eq $.Page.URL .URL }} aria-current="page"{{ end }}>{{ .Name }}</a>
+      <a href="{{ .URL }}" class="text-muted-foreground transition-colors hover:text-foreground text-sm"{{ if eq $.URL .URL }} aria-current="page"{{ end }}>{{ .Name }}</a>
       {{ end }}
     </div>
   </nav>

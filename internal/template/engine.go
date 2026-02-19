@@ -16,6 +16,7 @@ import (
 type Engine struct {
 	templates *template.Template
 	funcMap   template.FuncMap
+	sources   map[string]string
 }
 
 // NewEngine creates a template Engine by loading .html files from the theme
@@ -66,11 +67,13 @@ func NewEngine(themePath, userLayoutPath string) (*Engine, error) {
 	// We need to re-parse because Go templates bind functions at parse time.
 	// Instead, we rebuild from scratch with the partial function in place.
 	root := template.New("").Funcs(e.funcMap)
+	e.sources = make(map[string]string, len(files))
 	for name, filePath := range files {
 		content, err := os.ReadFile(filePath)
 		if err != nil {
 			return nil, fmt.Errorf("reading template %s: %w", filePath, err)
 		}
+		e.sources[name] = string(content)
 		t := root.New(name)
 		if _, err := t.Parse(string(content)); err != nil {
 			return nil, fmt.Errorf("parsing template %s: %w", name, err)
@@ -208,6 +211,84 @@ func (e *Engine) Execute(templateName string, ctx *PageContext) ([]byte, error) 
 	var buf bytes.Buffer
 	if err := t.Execute(&buf, ctx); err != nil {
 		return nil, fmt.Errorf("executing template %q: %w", templateName, err)
+	}
+	return buf.Bytes(), nil
+}
+
+// ExecutePage renders a page template through the baseof layout using an
+// isolated per-render template set to avoid "main" block definition conflicts
+// between pages. Each call builds a fresh set containing only partials +
+// _default/baseof.html + the specific templateName, then executes baseof.
+// Falls back to Execute if no baseof source is available.
+func (e *Engine) ExecutePage(templateName string, ctx *PageContext) ([]byte, error) {
+	const baseof = "_default/baseof.html"
+
+	// Fall back to Execute if baseof is not available.
+	if _, ok := e.sources[baseof]; !ok {
+		return e.Execute(templateName, ctx)
+	}
+
+	// Build a per-render isolated template set. The partial closure captures
+	// localSet by variable reference so it uses the fully-populated set when
+	// actually called during execution.
+	var localSet *template.Template
+
+	localFuncMap := make(template.FuncMap, len(e.funcMap))
+	maps.Copy(localFuncMap, e.funcMap)
+	localFuncMap["partial"] = func(name string, pctx any) (template.HTML, error) {
+		tmplName := name
+		if !strings.HasPrefix(name, "partials/") {
+			tmplName = "partials/" + name
+		}
+		t := localSet.Lookup(tmplName)
+		if t == nil {
+			t = localSet.Lookup(name)
+		}
+		if t == nil {
+			return "", fmt.Errorf("partial template %q not found", name)
+		}
+		var buf bytes.Buffer
+		if err := t.Execute(&buf, pctx); err != nil {
+			return "", fmt.Errorf("executing partial %q: %w", name, err)
+		}
+		return template.HTML(buf.String()), nil
+	}
+
+	localSet = template.New("").Funcs(localFuncMap)
+
+	// Add all partials.
+	for name, src := range e.sources {
+		if strings.HasPrefix(name, "partials/") {
+			t := localSet.New(name)
+			if _, err := t.Parse(src); err != nil {
+				return nil, fmt.Errorf("parsing partial %s: %w", name, err)
+			}
+		}
+	}
+
+	// Add baseof.
+	baseofT := localSet.New(baseof)
+	if _, err := baseofT.Parse(e.sources[baseof]); err != nil {
+		return nil, fmt.Errorf("parsing baseof: %w", err)
+	}
+
+	// Add the specific page template (produces the "main" block definition).
+	if templateName != baseof {
+		src, ok := e.sources[templateName]
+		if !ok {
+			return nil, fmt.Errorf("template %q not found", templateName)
+		}
+		t := localSet.New(templateName)
+		if _, err := t.Parse(src); err != nil {
+			return nil, fmt.Errorf("parsing template %s: %w", templateName, err)
+		}
+	}
+
+	// Execute baseof, which calls {{ block "main" . }} resolved by templateName.
+	t := localSet.Lookup(baseof)
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, ctx); err != nil {
+		return nil, fmt.Errorf("executing template %q via baseof: %w", templateName, err)
 	}
 	return buf.Bytes(), nil
 }

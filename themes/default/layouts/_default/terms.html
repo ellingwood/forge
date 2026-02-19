@@ -1,8 +1,8 @@
 {{ define "main" }}
 <div class="max-w-4xl mx-auto px-4 py-8">
-  <h1 class="text-3xl font-bold mb-8">{{ .Page.Title }}</h1>
+  <h1 class="text-3xl font-bold mb-8">{{ .Title }}</h1>
   <div class="flex flex-wrap gap-3">
-    {{ range .Page.Pages }}
+    {{ range where (where .Site.Pages "Type" "taxonomy") "Section" .Section }}
     <a href="{{ .URL }}" class="inline-flex items-center px-4 py-2 rounded-full bg-secondary text-secondary-foreground hover:bg-primary hover:text-primary-foreground transition-colors">
       {{ .Title }}
     </a>

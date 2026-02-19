@@ -1,28 +1,28 @@
 {{ define "main" }}
 <article class="max-w-3xl mx-auto px-4 py-8">
   <header class="mb-8">
-    <h1 class="text-3xl font-bold mb-4">{{ .Page.Title }}</h1>
-    {{ if .Page.Description }}
-    <p class="text-lg text-muted-foreground mb-4">{{ .Page.Description }}</p>
+    <h1 class="text-3xl font-bold mb-4">{{ .Title }}</h1>
+    {{ if .Description }}
+    <p class="text-lg text-muted-foreground mb-4">{{ .Description }}</p>
     {{ end }}
-    {{ if .Page.Params.tech }}
+    {{ if .Params.tech }}
     <div class="flex flex-wrap gap-2 mb-4">
-      {{ range .Page.Params.tech }}
+      {{ range .Params.tech }}
       <span class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-secondary text-secondary-foreground">{{ . }}</span>
       {{ end }}
     </div>
     {{ end }}
     <div class="flex gap-4">
-      {{ if .Page.Params.github }}
-      <a href="{{ .Page.Params.github }}" class="text-primary hover:underline" target="_blank" rel="noopener">GitHub</a>
+      {{ if .Params.github }}
+      <a href="{{ .Params.github }}" class="text-primary hover:underline" target="_blank" rel="noopener">GitHub</a>
       {{ end }}
-      {{ if .Page.Params.demo }}
-      <a href="{{ .Page.Params.demo }}" class="text-primary hover:underline" target="_blank" rel="noopener">Live Demo</a>
+      {{ if .Params.demo }}
+      <a href="{{ .Params.demo }}" class="text-primary hover:underline" target="_blank" rel="noopener">Live Demo</a>
       {{ end }}
     </div>
   </header>
   <div class="prose dark:prose-invert max-w-none">
-    {{ .Page.Content }}
+    {{ .Content }}
   </div>
 </article>
 {{ end }}

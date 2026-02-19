@@ -1,9 +1,9 @@
 {{ define "main" }}
 <div class="max-w-4xl mx-auto px-4 py-8">
-  <h1 class="text-3xl font-bold mb-2">{{ .Page.Title }}</h1>
-  <p class="text-muted-foreground mb-8">{{ len .Page.Pages }} posts</p>
+  <h1 class="text-3xl font-bold mb-2">{{ .Title }}</h1>
+  <p class="text-muted-foreground mb-8">{{ len (index (index .Site.Taxonomies .Section) .Title) }} posts</p>
   <div class="space-y-6">
-    {{ range .Page.Pages }}
+    {{ range index (index .Site.Taxonomies .Section) .Title }}
     <article class="border-b border-border pb-6">
       <h2 class="text-xl font-semibold">
         <a href="{{ .URL }}" class="hover:text-primary transition-colors">{{ .Title }}</a>

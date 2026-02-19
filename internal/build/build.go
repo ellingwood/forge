@@ -242,7 +242,7 @@ func (b *Builder) Build() (*BuildResult, error) {
 			}
 		}
 
-		rendered, err := engine.Execute(templateName, ctx)
+		rendered, err := engine.ExecutePage(templateName, ctx)
 		if err != nil {
 			return fmt.Errorf("executing template %s for %s: %w", templateName, p.SourcePath, err)
 		}
@@ -273,7 +273,7 @@ func (b *Builder) Build() (*BuildResult, error) {
 			Title: "Page Not Found",
 			Site:  siteCtx,
 		}
-		rendered404, err := engine.Execute(notFoundTemplate, notFoundCtx)
+		rendered404, err := engine.ExecutePage(notFoundTemplate, notFoundCtx)
 		if err != nil {
 			return nil, fmt.Errorf("rendering 404 page: %w", err)
 		}

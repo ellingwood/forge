@@ -601,3 +601,99 @@ func TestResolveTaxonomy(t *testing.T) {
 		t.Errorf("Resolve taxonomylist = %q, want %q", got, "_default/terms.html")
 	}
 }
+
+func TestExecutePage(t *testing.T) {
+	// Build a theme with baseof + two distinct page templates.
+	themeDir := t.TempDir()
+	defaultDir := filepath.Join(themeDir, "layouts", "_default")
+	if err := os.MkdirAll(defaultDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	layoutDir := filepath.Join(themeDir, "layouts")
+
+	baseof := `<!DOCTYPE html><html><body>{{ block "main" . }}{{ end }}</body></html>`
+	single := `{{ define "main" }}<article><h1>{{ .Title }}</h1>{{ .Content }}</article>{{ end }}`
+	index := `{{ define "main" }}<section><h1>Home: {{ .Title }}</h1></section>{{ end }}`
+
+	for name, content := range map[string]string{
+		filepath.Join(defaultDir, "baseof.html"): baseof,
+		filepath.Join(defaultDir, "single.html"): single,
+		filepath.Join(layoutDir, "index.html"):   index,
+	} {
+		if err := os.WriteFile(name, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	eng, err := NewEngine(themeDir, "")
+	if err != nil {
+		t.Fatalf("NewEngine failed: %v", err)
+	}
+
+	singleCtx := &PageContext{
+		Title:   "My Post",
+		Content: template.HTML("<p>Post content</p>"),
+		Site:    &SiteContext{Title: "My Site"},
+	}
+	homeCtx := &PageContext{
+		Title: "Welcome",
+		Site:  &SiteContext{Title: "My Site"},
+	}
+
+	t.Run("single template renders through baseof", func(t *testing.T) {
+		out, err := eng.ExecutePage("_default/single.html", singleCtx)
+		if err != nil {
+			t.Fatalf("ExecutePage failed: %v", err)
+		}
+		output := string(out)
+		if !strings.Contains(output, "<!DOCTYPE html>") {
+			t.Errorf("output should contain doctype from baseof, got: %s", output)
+		}
+		if !strings.Contains(output, "<article>") {
+			t.Errorf("output should contain article from single template, got: %s", output)
+		}
+		if !strings.Contains(output, "My Post") {
+			t.Errorf("output should contain title, got: %s", output)
+		}
+		if strings.Contains(output, "Home:") {
+			t.Errorf("single output should not contain home content, got: %s", output)
+		}
+	})
+
+	t.Run("index template renders through baseof", func(t *testing.T) {
+		out, err := eng.ExecutePage("index.html", homeCtx)
+		if err != nil {
+			t.Fatalf("ExecutePage failed: %v", err)
+		}
+		output := string(out)
+		if !strings.Contains(output, "<!DOCTYPE html>") {
+			t.Errorf("output should contain doctype from baseof, got: %s", output)
+		}
+		if !strings.Contains(output, "<section>") {
+			t.Errorf("output should contain section from index template, got: %s", output)
+		}
+		if !strings.Contains(output, "Home: Welcome") {
+			t.Errorf("output should contain home content, got: %s", output)
+		}
+		if strings.Contains(output, "<article>") {
+			t.Errorf("index output should not contain single article content, got: %s", output)
+		}
+	})
+
+	t.Run("repeated calls do not cross-contaminate", func(t *testing.T) {
+		singleOut, err := eng.ExecutePage("_default/single.html", singleCtx)
+		if err != nil {
+			t.Fatalf("ExecutePage single failed: %v", err)
+		}
+		indexOut, err := eng.ExecutePage("index.html", homeCtx)
+		if err != nil {
+			t.Fatalf("ExecutePage index failed: %v", err)
+		}
+		if strings.Contains(string(singleOut), "Home:") {
+			t.Errorf("single render should not contain home content: %s", singleOut)
+		}
+		if strings.Contains(string(indexOut), "<article>") {
+			t.Errorf("index render should not contain single article content: %s", indexOut)
+		}
+	})
+}
