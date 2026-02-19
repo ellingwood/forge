@@ -46,7 +46,7 @@ forge/
 │   ├── seo/            # Sitemap, robots.txt, meta tag generation
 │   ├── server/         # Dev server with WebSocket live reload
 │   └── template/       # Go html/template wrapper + custom functions
-├── embedded/           # go:embed assets (default theme, Tailwind CLI binary)
+├── embedded/           # go:embed assets (default theme)
 ├── themes/default/     # Default theme (layouts, static, theme.yaml)
 └── testdata/           # Golden file test fixtures
 ```
@@ -74,6 +74,6 @@ make clean    # remove ./forge and public/
 ## Testing Notes
 
 - Golden file tests live in `testdata/`; input Markdown → expected HTML output
-- Regenerate golden files: `go test ./... -update`
+- Update testdata fixtures manually by editing files in `testdata/`
 - Integration tests build the `testdata/` test site and assert output structure
 - Run a single package: `go test ./internal/content/...`
