@@ -50,7 +50,7 @@ forge build
 ## CLI Reference
 
 | Command | Description |
-|---------|-------------|
+| --------- | ------------- |
 | `forge build` | Build the static site into `public/` |
 | `forge serve` | Start the dev server with live reload (default: `localhost:1313`) |
 | `forge new site <name>` | Scaffold a new site with default theme |
@@ -67,7 +67,7 @@ forge build
 
 ## Site Structure
 
-```
+```tree
 my-site/
 ├── forge.yaml              # Site configuration
 ├── content/
