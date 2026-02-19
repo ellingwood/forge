@@ -133,6 +133,7 @@ type S3Config struct {
 type CloudFrontConfig struct {
 	DistributionID  string   `yaml:"distributionId"  mapstructure:"distributionId"`
 	InvalidatePaths []string `yaml:"invalidatePaths" mapstructure:"invalidatePaths"`
+	URLRewrite      bool     `yaml:"urlRewrite"      mapstructure:"urlRewrite"`
 }
 
 // Default returns a SiteConfig populated with sensible default values.

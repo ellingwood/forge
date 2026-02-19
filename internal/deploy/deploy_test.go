@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -61,6 +62,29 @@ func (m *mockCloudFrontClient) CreateInvalidation(_ context.Context, distributio
 		paths          []string
 	}{distributionID, paths})
 	return nil
+}
+
+// mockCloudFrontFunctionClient for testing
+type mockCloudFrontFunctionClient struct {
+	calls []struct {
+		distributionID string
+		functionName   string
+		functionCode   string
+	}
+	arn string
+	err error
+}
+
+func (m *mockCloudFrontFunctionClient) EnsureURLRewriteFunction(_ context.Context, distributionID, functionName, functionCode string) (string, error) {
+	if m.err != nil {
+		return "", m.err
+	}
+	m.calls = append(m.calls, struct {
+		distributionID string
+		functionName   string
+		functionCode   string
+	}{distributionID, functionName, functionCode})
+	return m.arn, nil
 }
 
 // createTempFile creates a file in the given directory with the given content.
@@ -349,7 +373,7 @@ func TestDeploy_DryRun(t *testing.T) {
 		DryRun:       true,
 	}
 
-	result, err := Deploy(context.Background(), cfg, dir, s3, cf)
+	result, err := Deploy(context.Background(), cfg, dir, s3, cf, nil)
 	if err != nil {
 		t.Fatalf("Deploy failed: %v", err)
 	}
@@ -396,7 +420,7 @@ func TestDeploy_UploadAndDelete(t *testing.T) {
 		Region: "us-east-1",
 	}
 
-	result, err := Deploy(context.Background(), cfg, dir, s3, cf)
+	result, err := Deploy(context.Background(), cfg, dir, s3, cf, nil)
 	if err != nil {
 		t.Fatalf("Deploy failed: %v", err)
 	}
@@ -446,7 +470,7 @@ func TestDeploy_WithCloudFront(t *testing.T) {
 		Distribution: "E1234567890",
 	}
 
-	result, err := Deploy(context.Background(), cfg, dir, s3, cf)
+	result, err := Deploy(context.Background(), cfg, dir, s3, cf, nil)
 	if err != nil {
 		t.Fatalf("Deploy failed: %v", err)
 	}
@@ -483,13 +507,181 @@ func TestDeploy_NoCloudFrontWithoutDistribution(t *testing.T) {
 		// Distribution is empty
 	}
 
-	_, err := Deploy(context.Background(), cfg, dir, s3, cf)
+	_, err := Deploy(context.Background(), cfg, dir, s3, cf, nil)
 	if err != nil {
 		t.Fatalf("Deploy failed: %v", err)
 	}
 
 	if len(cf.invalidations) != 0 {
 		t.Errorf("expected no invalidations without distribution, got %d", len(cf.invalidations))
+	}
+}
+
+func TestDeploy_URLRewriteCalled(t *testing.T) {
+	dir := t.TempDir()
+	createTempFile(t, dir, "index.html", "<html>test</html>")
+
+	s3 := &mockS3Client{objects: map[string]string{}}
+	cf := &mockCloudFrontClient{}
+	cfFunc := &mockCloudFrontFunctionClient{arn: "arn:aws:cloudfront::123:function/forge-url-rewrite"}
+
+	cfg := DeployConfig{
+		Bucket:       "test-bucket",
+		Region:       "us-east-1",
+		Distribution: "E1234567890",
+		URLRewrite:   true,
+	}
+
+	result, err := Deploy(context.Background(), cfg, dir, s3, cf, cfFunc)
+	if err != nil {
+		t.Fatalf("Deploy failed: %v", err)
+	}
+
+	if len(cfFunc.calls) != 1 {
+		t.Fatalf("expected 1 URL rewrite call, got %d", len(cfFunc.calls))
+	}
+	call := cfFunc.calls[0]
+	if call.distributionID != "E1234567890" {
+		t.Errorf("expected distribution E1234567890, got %s", call.distributionID)
+	}
+	if call.functionName != "forge-url-rewrite" {
+		t.Errorf("expected function name forge-url-rewrite, got %s", call.functionName)
+	}
+	if call.functionCode != URLRewriteFunctionCode {
+		t.Errorf("function code mismatch")
+	}
+	if len(result.Errors) != 0 {
+		t.Errorf("expected no errors, got %v", result.Errors)
+	}
+}
+
+func TestDeploy_URLRewriteSkippedNoDistribution(t *testing.T) {
+	dir := t.TempDir()
+	createTempFile(t, dir, "index.html", "<html>test</html>")
+
+	s3 := &mockS3Client{objects: map[string]string{}}
+	cf := &mockCloudFrontClient{}
+	cfFunc := &mockCloudFrontFunctionClient{arn: "arn:aws:cloudfront::123:function/forge-url-rewrite"}
+
+	cfg := DeployConfig{
+		Bucket:     "test-bucket",
+		Region:     "us-east-1",
+		URLRewrite: true,
+		// Distribution is empty
+	}
+
+	_, err := Deploy(context.Background(), cfg, dir, s3, cf, cfFunc)
+	if err != nil {
+		t.Fatalf("Deploy failed: %v", err)
+	}
+
+	if len(cfFunc.calls) != 0 {
+		t.Errorf("expected no URL rewrite calls without distribution, got %d", len(cfFunc.calls))
+	}
+}
+
+func TestDeploy_URLRewriteSkippedWhenDisabled(t *testing.T) {
+	dir := t.TempDir()
+	createTempFile(t, dir, "index.html", "<html>test</html>")
+
+	s3 := &mockS3Client{objects: map[string]string{}}
+	cf := &mockCloudFrontClient{}
+	cfFunc := &mockCloudFrontFunctionClient{arn: "arn:aws:cloudfront::123:function/forge-url-rewrite"}
+
+	cfg := DeployConfig{
+		Bucket:       "test-bucket",
+		Region:       "us-east-1",
+		Distribution: "E1234567890",
+		URLRewrite:   false,
+	}
+
+	_, err := Deploy(context.Background(), cfg, dir, s3, cf, cfFunc)
+	if err != nil {
+		t.Fatalf("Deploy failed: %v", err)
+	}
+
+	if len(cfFunc.calls) != 0 {
+		t.Errorf("expected no URL rewrite calls when disabled, got %d", len(cfFunc.calls))
+	}
+}
+
+func TestDeploy_URLRewriteErrorNonFatal(t *testing.T) {
+	dir := t.TempDir()
+	createTempFile(t, dir, "index.html", "<html>test</html>")
+
+	s3 := &mockS3Client{objects: map[string]string{}}
+	cf := &mockCloudFrontClient{}
+	cfFunc := &mockCloudFrontFunctionClient{err: fmt.Errorf("access denied")}
+
+	cfg := DeployConfig{
+		Bucket:       "test-bucket",
+		Region:       "us-east-1",
+		Distribution: "E1234567890",
+		URLRewrite:   true,
+	}
+
+	result, err := Deploy(context.Background(), cfg, dir, s3, cf, cfFunc)
+	if err != nil {
+		t.Fatalf("Deploy should not return fatal error for URL rewrite failure: %v", err)
+	}
+
+	// The error should be appended to result.Errors (non-fatal)
+	found := false
+	for _, e := range result.Errors {
+		if e != nil {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected URL rewrite error in result.Errors")
+	}
+}
+
+func TestDeploy_URLRewriteDryRun(t *testing.T) {
+	dir := t.TempDir()
+	createTempFile(t, dir, "index.html", "<html>test</html>")
+
+	s3 := &mockS3Client{objects: map[string]string{}}
+	cf := &mockCloudFrontClient{}
+	cfFunc := &mockCloudFrontFunctionClient{arn: "arn:aws:cloudfront::123:function/forge-url-rewrite"}
+
+	cfg := DeployConfig{
+		Bucket:       "test-bucket",
+		Region:       "us-east-1",
+		Distribution: "E1234567890",
+		URLRewrite:   true,
+		DryRun:       true,
+	}
+
+	_, err := Deploy(context.Background(), cfg, dir, s3, cf, cfFunc)
+	if err != nil {
+		t.Fatalf("Deploy failed: %v", err)
+	}
+
+	// In dry run, the function client should NOT be called
+	if len(cfFunc.calls) != 0 {
+		t.Errorf("expected no URL rewrite calls in dry run, got %d", len(cfFunc.calls))
+	}
+}
+
+func TestDeploy_NilFunctionClientNoPanic(t *testing.T) {
+	dir := t.TempDir()
+	createTempFile(t, dir, "index.html", "<html>test</html>")
+
+	s3 := &mockS3Client{objects: map[string]string{}}
+	cf := &mockCloudFrontClient{}
+
+	cfg := DeployConfig{
+		Bucket:       "test-bucket",
+		Region:       "us-east-1",
+		Distribution: "E1234567890",
+		URLRewrite:   true, // enabled but nil client
+	}
+
+	// Should not panic with nil CloudFrontFunctionClient
+	_, err := Deploy(context.Background(), cfg, dir, s3, cf, nil)
+	if err != nil {
+		t.Fatalf("Deploy failed: %v", err)
 	}
 }
 
