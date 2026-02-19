@@ -1,0 +1,9 @@
+{{ if .Page.Tags }}
+<div class="flex flex-wrap gap-2 mt-4">
+  {{ range .Page.Tags }}
+  <a href="/tags/{{ slugify . }}/" class="inline-flex items-center px-3 py-1 rounded-full text-xs bg-secondary text-secondary-foreground hover:bg-primary hover:text-primary-foreground transition-colors">
+    {{ . }}
+  </a>
+  {{ end }}
+</div>
+{{ end }}

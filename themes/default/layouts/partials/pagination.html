@@ -1,0 +1,19 @@
+{{ if .Page.Pager }}
+{{ with .Page.Pager }}
+{{ if or .HasPrev .HasNext }}
+<nav class="flex justify-center items-center gap-4 py-8" aria-label="Pagination">
+  {{ if .HasPrev }}
+  <a href="{{ .PrevURL }}" class="px-4 py-2 rounded bg-secondary text-secondary-foreground hover:bg-primary hover:text-primary-foreground transition-colors">&larr; Newer</a>
+  {{ else }}
+  <span class="px-4 py-2 rounded bg-muted text-muted-foreground cursor-not-allowed">&larr; Newer</span>
+  {{ end }}
+  <span class="text-sm text-muted-foreground">Page {{ .PageNumber }} of {{ .TotalPages }}</span>
+  {{ if .HasNext }}
+  <a href="{{ .NextURL }}" class="px-4 py-2 rounded bg-secondary text-secondary-foreground hover:bg-primary hover:text-primary-foreground transition-colors">Older &rarr;</a>
+  {{ else }}
+  <span class="px-4 py-2 rounded bg-muted text-muted-foreground cursor-not-allowed">Older &rarr;</span>
+  {{ end }}
+</nav>
+{{ end }}
+{{ end }}
+{{ end }}
