@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+*:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+.card-hover {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.card-hover:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

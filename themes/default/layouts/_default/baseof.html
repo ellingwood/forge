@@ -7,8 +7,11 @@
   {{ end }}
 </head>
 <body class="bg-background text-foreground font-sans antialiased min-h-screen flex flex-col">
+  <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded">
+    Skip to content
+  </a>
   {{ partial "header.html" . }}
-  <main class="flex-1">
+  <main id="main-content" class="flex-1">
     {{ block "main" . }}{{ end }}
   </main>
   {{ partial "footer.html" . }}
