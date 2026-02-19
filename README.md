@@ -95,6 +95,70 @@ tags: ["go", "web"]
 Post content here...
 ```
 
+## Media & Assets
+
+Forge supports three patterns for images and other static files.
+
+### Global assets: `static/`
+
+Files in `static/` are copied verbatim into `public/` at the same relative path.
+Use this for site-wide assets (favicon, logo, Open Graph image) that are not tied
+to a specific page.
+
+```
+my-site/
+└── static/
+    ├── favicon.ico          → public/favicon.ico
+    └── images/
+        └── og-image.png     → public/images/og-image.png
+```
+
+Reference them in Markdown with a root-relative path:
+
+```markdown
+![Site logo](/images/og-image.png)
+```
+
+### Page bundles (co-located assets)
+
+A page bundle is a directory whose name matches the post slug and that contains
+an `index.md` alongside any assets for that page. Forge copies all non-Markdown
+files in the bundle directory next to the rendered `index.html`.
+
+```
+content/blog/
+└── my-post/
+    ├── index.md             # page content + frontmatter
+    ├── hero.png             → public/blog/my-post/hero.png
+    └── diagram.svg          → public/blog/my-post/diagram.svg
+```
+
+Reference bundle assets with a relative path in the Markdown:
+
+```markdown
+![Architecture diagram](diagram.svg)
+```
+
+### Cover images
+
+Any page can declare a cover image in its frontmatter. Forge passes this to the
+theme as `.Cover`, which the default theme renders as a thumbnail on post-card
+listings and as a full-width banner at the top of single posts.
+
+```yaml
+---
+title: "My Post"
+date: 2025-01-15
+cover:
+  image: hero.png        # relative to the bundle, or an absolute path from public/
+  alt: "Descriptive alt text"
+  caption: "Optional caption shown below the image"
+---
+```
+
+Use a bundle-relative path (`hero.png`) for co-located images, or a root-relative
+path (`/images/hero.png`) for images in `static/`.
+
 ## MCP Server
 
 Forge ships an [MCP](https://modelcontextprotocol.io) server that gives AI clients (Claude Code, etc.) semantic access to your site's content graph, build system, and configuration — without parsing raw files.

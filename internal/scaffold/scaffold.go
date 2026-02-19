@@ -3,6 +3,7 @@
 package scaffold
 
 import (
+	"embed"
 	"fmt"
 	"io/fs"
 	"os"
@@ -14,6 +15,9 @@ import (
 
 	"golang.org/x/text/unicode/norm"
 )
+
+//go:embed seedimages
+var seedImages embed.FS
 
 // nowFunc is the function used to get the current time.
 // It is a package-level variable so tests can override it.
@@ -212,134 +216,8 @@ written in Go.
 Feel free to replace this content with your own story.
 `, now.Format(time.RFC3339)),
 		},
-		// Blog posts
-		{
-			path: filepath.Join(name, "content", "blog", "2025-01-15-getting-started-with-go.md"),
-			content: `---
-title: "Getting Started with Go"
-date: 2025-01-15T09:00:00Z
-tags: ["go", "tutorial"]
-categories: ["programming"]
-description: "A beginner-friendly introduction to the Go programming language."
----
-
-Go is a statically typed, compiled language designed at Google. It combines the
-performance of C with the readability of Python, making it an excellent choice for
-web services, CLI tools, and systems programming.
-
-## Why Go?
-
-Go's simplicity is its greatest strength. The language has a small specification,
-a fast compiler, and a rich standard library. The built-in concurrency primitives
-(goroutines and channels) make writing concurrent programs straightforward.
-
-## Your First Program
-
-` + "```go" + `
-package main
-
-import "fmt"
-
-func main() {
-    fmt.Println("Hello, world!")
-}
-` + "```" + `
-
-Save this to `+"`main.go`"+` and run `+"`go run main.go`"+`. You should see:
-
-` + "```" + `
-Hello, world!
-` + "```" + `
-
-## Next Steps
-
-- Read the [official tour](https://go.dev/tour/)
-- Explore the [standard library](https://pkg.go.dev/std)
-- Build something small: a CLI tool, a web API, or a file processor
-`,
-		},
-		{
-			path: filepath.Join(name, "content", "blog", "2025-02-10-building-static-sites.md"),
-			content: `---
-title: "Building Static Sites with Forge"
-date: 2025-02-10T10:00:00Z
-tags: ["go", "web"]
-categories: ["tools"]
-description: "How Forge turns Markdown files into a fast static website."
----
-
-Static sites have made a comeback. They're fast, cheap to host, and easy to reason
-about. Forge is a static site generator written in Go that aims to be simple,
-fast, and opinionated.
-
-## How It Works
-
-Forge reads Markdown files from your `+"`content/`"+` directory, renders them with
-your chosen theme, and writes the output to `+"`public/`"+`. The result is a
-directory of plain HTML files you can serve from any CDN or object storage bucket.
-
-## Key Features
-
-- **Fast builds** — Forge renders pages in parallel using all available CPU cores
-- **Live reload** — `+"`forge serve`"+` watches for changes and reloads the browser
-- **Taxonomies** — Tags and categories generate listing pages automatically
-- **RSS & Atom feeds** — Generated automatically from your blog section
-- **Search index** — A JSON search index is generated for client-side search
-
-## Getting Started
-
-` + "```sh" + `
-forge new site mysite
-cd mysite
-forge serve
-` + "```" + `
-
-Open [http://localhost:1313](http://localhost:1313) and start writing.
-`,
-		},
-		{
-			path: filepath.Join(name, "content", "blog", "2025-03-05-deploying-to-the-cloud.md"),
-			content: `---
-title: "Deploying to the Cloud"
-date: 2025-03-05T08:00:00Z
-tags: ["devops", "tutorial"]
-categories: ["infrastructure"]
-description: "Ship your static site to S3, Cloudflare Pages, or any CDN."
----
-
-Once you've built your site with `+"`forge build`"+`, deploying is just copying files.
-Here are three common options.
-
-## Amazon S3 + CloudFront
-
-1. Create an S3 bucket with static website hosting enabled
-2. Upload `+"`public/`"+` with `+"`aws s3 sync public/ s3://your-bucket`"+`
-3. Create a CloudFront distribution pointing at your bucket
-4. Set a custom domain via Route 53
-
-## Cloudflare Pages
-
-Cloudflare Pages has a free tier and deploys directly from Git. Point it at your
-repository, set the build command to `+"`forge build`"+` and the output directory to
-`+"`public`"+`, and every push deploys automatically.
-
-## Netlify
-
-Like Cloudflare Pages, Netlify supports Git-based deployments. Add a
-`+"`netlify.toml`"+`:
-
-` + "```toml" + `
-[build]
-  command = "forge build"
-  publish = "public"
-` + "```" + `
-
-## Tips
-
-- Always set `+"`baseURL`"+` in `+"`forge.yaml`"+` to your production domain before building
-- Use `+"`forge build --minify`"+` to shrink HTML output
-`,
-		},
+		// Blog posts 1–3 are page bundles (index.md + hero.png) written below.
+		// Posts 4–5 remain as flat .md files to show both patterns coexist.
 		{
 			path: filepath.Join(name, "content", "blog", "2025-04-20-markdown-tips.md"),
 			content: `---
@@ -355,7 +233,7 @@ produce cleaner, more readable documents.
 
 ## Use Headings Consistently
 
-Start with `+"`##`"+` (H2) for top-level sections — reserve `+"`#`"+` (H1) for the document
+Start with ` + "`##`" + ` (H2) for top-level sections — reserve ` + "`#`" + ` (H1) for the document
 title, which is usually injected by the template.
 
 ## Code Blocks
@@ -487,7 +365,179 @@ Each package has zero dependencies outside the standard library.
 		}
 	}
 
+	// Write the three page-bundle posts (index.md + hero.png each).
+	type bundlePost struct {
+		dir       string
+		indexMd   string
+		embedName string
+	}
+
+	bundles := []bundlePost{
+		{
+			dir: filepath.Join(name, "content", "blog", "2025-01-15-getting-started-with-go"),
+			indexMd: `---
+title: "Getting Started with Go"
+date: 2025-01-15T09:00:00Z
+tags: ["go", "tutorial"]
+categories: ["programming"]
+description: "A beginner-friendly introduction to the Go programming language."
+cover:
+  image: hero.png
+  alt: "Blue banner for Getting Started with Go"
+---
+
+Go is a statically typed, compiled language designed at Google. It combines the
+performance of C with the readability of Python, making it an excellent choice for
+web services, CLI tools, and systems programming.
+
+## Why Go?
+
+Go's simplicity is its greatest strength. The language has a small specification,
+a fast compiler, and a rich standard library. The built-in concurrency primitives
+(goroutines and channels) make writing concurrent programs straightforward.
+
+## Your First Program
+
+` + "```go" + `
+package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello, world!")
+}
+` + "```" + `
+
+Save this to ` + "`main.go`" + ` and run ` + "`go run main.go`" + `. You should see:
+
+` + "```" + `
+Hello, world!
+` + "```" + `
+
+## Next Steps
+
+- Read the [official tour](https://go.dev/tour/)
+- Explore the [standard library](https://pkg.go.dev/std)
+- Build something small: a CLI tool, a web API, or a file processor
+`,
+			embedName: "seedimages/hero-go.png",
+		},
+		{
+			dir: filepath.Join(name, "content", "blog", "2025-02-10-building-static-sites"),
+			indexMd: `---
+title: "Building Static Sites with Forge"
+date: 2025-02-10T10:00:00Z
+tags: ["go", "web"]
+categories: ["tools"]
+description: "How Forge turns Markdown files into a fast static website."
+cover:
+  image: hero.png
+  alt: "Indigo banner for Building Static Sites with Forge"
+---
+
+Static sites have made a comeback. They're fast, cheap to host, and easy to reason
+about. Forge is a static site generator written in Go that aims to be simple,
+fast, and opinionated.
+
+## How It Works
+
+Forge reads Markdown files from your ` + "`content/`" + ` directory, renders them with
+your chosen theme, and writes the output to ` + "`public/`" + `. The result is a
+directory of plain HTML files you can serve from any CDN or object storage bucket.
+
+## Key Features
+
+- **Fast builds** — Forge renders pages in parallel using all available CPU cores
+- **Live reload** — ` + "`forge serve`" + ` watches for changes and reloads the browser
+- **Taxonomies** — Tags and categories generate listing pages automatically
+- **RSS & Atom feeds** — Generated automatically from your blog section
+- **Search index** — A JSON search index is generated for client-side search
+
+## Getting Started
+
+` + "```sh" + `
+forge new site mysite
+cd mysite
+forge serve
+` + "```" + `
+
+Open [http://localhost:1313](http://localhost:1313) and start writing.
+`,
+			embedName: "seedimages/hero-static-sites.png",
+		},
+		{
+			dir: filepath.Join(name, "content", "blog", "2025-03-05-deploying-to-the-cloud"),
+			indexMd: `---
+title: "Deploying to the Cloud"
+date: 2025-03-05T08:00:00Z
+tags: ["devops", "tutorial"]
+categories: ["infrastructure"]
+description: "Ship your static site to S3, Cloudflare Pages, or any CDN."
+cover:
+  image: hero.png
+  alt: "Teal banner for Deploying to the Cloud"
+---
+
+Once you've built your site with ` + "`forge build`" + `, deploying is just copying files.
+Here are three common options.
+
+## Amazon S3 + CloudFront
+
+1. Create an S3 bucket with static website hosting enabled
+2. Upload ` + "`public/`" + ` with ` + "`aws s3 sync public/ s3://your-bucket`" + `
+3. Create a CloudFront distribution pointing at your bucket
+4. Set a custom domain via Route 53
+
+## Cloudflare Pages
+
+Cloudflare Pages has a free tier and deploys directly from Git. Point it at your
+repository, set the build command to ` + "`forge build`" + ` and the output directory to
+` + "`public`" + `, and every push deploys automatically.
+
+## Netlify
+
+Like Cloudflare Pages, Netlify supports Git-based deployments. Add a
+` + "`netlify.toml`" + `:
+
+` + "```toml" + `
+[build]
+  command = "forge build"
+  publish = "public"
+` + "```" + `
+
+## Tips
+
+- Always set ` + "`baseURL`" + ` in ` + "`forge.yaml`" + ` to your production domain before building
+- Use ` + "`forge build --minify`" + ` to shrink HTML output
+`,
+			embedName: "seedimages/hero-cloud.png",
+		},
+	}
+
+	for _, b := range bundles {
+		if err := os.MkdirAll(b.dir, 0o755); err != nil {
+			return fmt.Errorf("creating bundle directory %s: %w", b.dir, err)
+		}
+		indexPath := filepath.Join(b.dir, "index.md")
+		if err := os.WriteFile(indexPath, []byte(b.indexMd), 0o644); err != nil {
+			return fmt.Errorf("writing %s: %w", indexPath, err)
+		}
+		imgPath := filepath.Join(b.dir, "hero.png")
+		if err := writeSeedImage(imgPath, b.embedName); err != nil {
+			return fmt.Errorf("writing hero image for %s: %w", b.dir, err)
+		}
+	}
+
 	return nil
+}
+
+// writeSeedImage copies an embedded seed image to dest on disk.
+func writeSeedImage(dest, embedPath string) error {
+	data, err := seedImages.ReadFile(embedPath)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dest, data, 0o644)
 }
 
 // extractFS copies all files from srcDir within src into dstDir on disk.
