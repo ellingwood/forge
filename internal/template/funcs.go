@@ -46,6 +46,7 @@ func FuncMap() template.FuncMap {
 		// Helpers
 		"dict":  dict,
 		"slice": sliceHelper,
+		"join":  join,
 
 		// Partial helper — registered here for the func map; actual implementation
 		// is overridden in Engine after templates are parsed.
@@ -345,4 +346,21 @@ func dict(values ...any) (map[string]any, error) {
 // Registered as "slice" in the template func map.
 func sliceHelper(values ...any) []any {
 	return values
+}
+
+// join concatenates the elements of a slice using the given separator.
+// Non-slice values are returned as their string representation.
+func join(sep string, items any) string {
+	if items == nil {
+		return ""
+	}
+	v := reflect.ValueOf(items)
+	if v.Kind() != reflect.Slice {
+		return fmt.Sprintf("%v", items)
+	}
+	parts := make([]string, v.Len())
+	for i := 0; i < v.Len(); i++ {
+		parts[i] = fmt.Sprintf("%v", v.Index(i).Interface())
+	}
+	return strings.Join(parts, sep)
 }

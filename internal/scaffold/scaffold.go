@@ -562,6 +562,14 @@ func extractFS(src fs.FS, srcDir, dstDir string) error {
 	})
 }
 
+// RefreshTheme re-extracts theme files from the embedded FS into the site's
+// themes/ directory, overwriting existing files. This brings the on-disk theme
+// in sync with the version embedded in the current binary.
+func RefreshTheme(siteRoot string, themeFS fs.FS) error {
+	themeDst := filepath.Join(siteRoot, "themes")
+	return extractFS(themeFS, "themes", themeDst)
+}
+
 // NewPost creates a new blog post file at content/blog/YYYY-MM-DD-slug.md.
 // Parent directories are created if they do not exist.
 func NewPost(title string) error {

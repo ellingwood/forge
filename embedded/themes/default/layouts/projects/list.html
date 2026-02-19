@@ -1,10 +1,102 @@
 {{ define "main" }}
 <div class="max-w-6xl mx-auto px-4 py-8">
   <h1 class="text-3xl font-bold mb-8">Projects</h1>
-  <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-    {{ range .Site.Sections.projects }}
-    {{ partial "project-card.html" . }}
+
+  <div id="filter-controls" class="mb-8 hidden">
+    <div id="filter-buttons" class="flex flex-wrap gap-2"></div>
+  </div>
+
+  <div id="project-list" class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+    {{ range where .Site.Sections.projects "Type" "single" }}
+    <div class="project-item" data-tags="{{ join "," .Tags }}" data-categories="{{ join "," .Categories }}" data-tech="{{ join "," .Params.tech }}">
+      {{ partial "project-card.html" . }}
+    </div>
     {{ end }}
   </div>
 </div>
+
+<script>
+(function() {
+  var items = document.querySelectorAll('.project-item');
+  var allTags = {};
+  var allCategories = {};
+  var allTech = {};
+
+  items.forEach(function(item) {
+    var tags = item.getAttribute('data-tags');
+    var cats = item.getAttribute('data-categories');
+    var tech = item.getAttribute('data-tech');
+    if (tags) {
+      tags.split(',').forEach(function(t) { t = t.trim(); if (t) allTags[t] = true; });
+    }
+    if (cats) {
+      cats.split(',').forEach(function(c) { c = c.trim(); if (c) allCategories[c] = true; });
+    }
+    if (tech) {
+      tech.split(',').forEach(function(t) { t = t.trim(); if (t) allTech[t] = true; });
+    }
+  });
+
+  var tagNames = Object.keys(allTags).sort();
+  var catNames = Object.keys(allCategories).sort();
+  var techNames = Object.keys(allTech).sort();
+
+  if (tagNames.length === 0 && catNames.length === 0 && techNames.length === 0) return;
+
+  var controls = document.getElementById('filter-controls');
+  var btnContainer = document.getElementById('filter-buttons');
+  controls.classList.remove('hidden');
+
+  var activeFilter = null;
+  var activeType = null;
+
+  function makeBtn(label, type, value) {
+    var btn = document.createElement('button');
+    btn.textContent = label;
+    btn.className = 'badge text-xs cursor-pointer transition-colors';
+    btn.setAttribute('data-filter-type', type);
+    btn.setAttribute('data-filter-value', value);
+    if (type === 'all') btn.classList.add('badge-active');
+    btn.addEventListener('click', function() {
+      if (type === 'all') { activeFilter = null; activeType = null; }
+      else { activeFilter = value; activeType = type; }
+      applyFilter();
+    });
+    return btn;
+  }
+
+  btnContainer.appendChild(makeBtn('All', 'all', ''));
+
+  function addGroup(label, names, type) {
+    if (names.length === 0) return;
+    var span = document.createElement('span');
+    span.textContent = label;
+    span.className = 'text-xs text-muted-foreground font-medium ml-2 self-center';
+    btnContainer.appendChild(span);
+    names.forEach(function(n) { btnContainer.appendChild(makeBtn(n, type, n)); });
+  }
+
+  addGroup('Tech:', techNames, 'tech');
+  addGroup('Categories:', catNames, 'category');
+  addGroup('Tags:', tagNames, 'tag');
+
+  function applyFilter() {
+    var btns = btnContainer.querySelectorAll('button');
+    btns.forEach(function(b) {
+      b.classList.remove('badge-active');
+      var bType = b.getAttribute('data-filter-type');
+      var bVal = b.getAttribute('data-filter-value');
+      if (activeFilter === null && bType === 'all') b.classList.add('badge-active');
+      else if (bType === activeType && bVal === activeFilter) b.classList.add('badge-active');
+    });
+
+    items.forEach(function(item) {
+      if (activeFilter === null) { item.style.display = ''; return; }
+      var attrMap = { tag: 'data-tags', category: 'data-categories', tech: 'data-tech' };
+      var values = (item.getAttribute(attrMap[activeType]) || '').split(',').map(function(v) { return v.trim(); });
+      item.style.display = values.indexOf(activeFilter) !== -1 ? '' : 'none';
+    });
+  }
+})();
+</script>
 {{ end }}

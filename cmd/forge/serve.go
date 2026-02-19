@@ -153,9 +153,6 @@ var serveCmd = &cobra.Command{
 			cancel()
 		}()
 
-		addr := fmt.Sprintf("http://%s:%d", bind, port)
-		fmt.Fprintf(cmd.OutOrStdout(), "Serving at %s\n", addr)
-
 		// 7. Start the server (blocks until shutdown).
 		if err := srv.Start(ctx); err != nil {
 			return fmt.Errorf("server error: %w", err)
@@ -167,8 +164,8 @@ var serveCmd = &cobra.Command{
 
 // treeNode is a node in an ordered URL tree.
 type treeNode struct {
-	children     map[string]*treeNode
-	childOrder   []string
+	children   map[string]*treeNode
+	childOrder []string
 }
 
 // renderTree produces a pretty-printed tree of URL paths.
