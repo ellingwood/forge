@@ -61,6 +61,7 @@ forge build
 | `forge list future` | List future-dated content |
 | `forge list expired` | List expired content |
 | `forge deploy` | Deploy `public/` to S3 + CloudFront |
+| `forge config` | Print the fully resolved site configuration |
 | `forge mcp` | Start the MCP server over stdio |
 | `forge version` | Print version, commit hash, and build date |
 
