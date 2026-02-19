@@ -64,7 +64,6 @@ func NewSite(name string, themeFS fs.FS) error {
 	dirs := []string{
 		filepath.Join(name, "content", "blog"),
 		filepath.Join(name, "content", "projects"),
-		filepath.Join(name, "content", "pages"),
 		filepath.Join(name, "layouts"),
 		filepath.Join(name, "static"),
 		filepath.Join(name, "data"),
@@ -118,7 +117,7 @@ description: ""
 Write your page content here.
 `, now.Format(time.RFC3339))
 
-	aboutPath := filepath.Join(name, "content", "pages", "about.md")
+	aboutPath := filepath.Join(name, "content", "about.md")
 	if err := os.WriteFile(aboutPath, []byte(aboutContent), 0o644); err != nil {
 		return fmt.Errorf("writing about.md: %w", err)
 	}
@@ -194,7 +193,7 @@ description: "Thoughts, tutorials, and notes."
 		},
 		// About page (override the stub written by NewSite)
 		{
-			path: filepath.Join(name, "content", "pages", "about.md"),
+			path: filepath.Join(name, "content", "about.md"),
 			content: fmt.Sprintf(`---
 title: "About"
 date: %s

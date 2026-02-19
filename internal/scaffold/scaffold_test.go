@@ -73,7 +73,6 @@ func TestNewSite(t *testing.T) {
 	expectedDirs := []string{
 		"content/blog",
 		"content/projects",
-		"content/pages",
 		"layouts",
 		"static",
 		"data",
@@ -127,7 +126,7 @@ func TestNewSite(t *testing.T) {
 	}
 
 	// Verify about page.
-	aboutData, err := os.ReadFile(filepath.Join(siteName, "content", "pages", "about.md"))
+	aboutData, err := os.ReadFile(filepath.Join(siteName, "content", "about.md"))
 	if err != nil {
 		t.Fatalf("reading about.md: %v", err)
 	}
