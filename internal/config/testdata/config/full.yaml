@@ -1,0 +1,86 @@
+baseURL: "https://example.com"
+title: "My Site"
+description: "Personal portfolio and blog"
+language: "en"
+theme: "default"
+
+author:
+  name: "Austin"
+  email: "austin@example.com"
+  bio: "Cloud engineer."
+  avatar: "/images/avatar.jpg"
+  social:
+    github: "username"
+    linkedin: "username"
+    twitter: "username"
+
+menu:
+  main:
+    - name: "Home"
+      url: "/"
+      weight: 1
+    - name: "Blog"
+      url: "/blog/"
+      weight: 2
+
+pagination:
+  pageSize: 10
+
+taxonomies:
+  tag: tags
+  category: categories
+
+highlight:
+  style: "github"
+  darkStyle: "github-dark"
+  lineNumbers: false
+  tabWidth: 4
+
+search:
+  enabled: true
+  contentLength: 5000
+  keys:
+    - name: "title"
+      weight: 2.0
+    - name: "tags"
+      weight: 1.5
+    - name: "summary"
+      weight: 1.0
+    - name: "content"
+      weight: 0.5
+
+feeds:
+  rss: true
+  atom: true
+  limit: 20
+  fullContent: true
+  sections:
+    - blog
+
+seo:
+  titleTemplate: "%s | My Site"
+  defaultImage: "/images/og-default.jpg"
+  twitterHandle: "@myhandle"
+  jsonLD: true
+
+server:
+  port: 1313
+  host: "localhost"
+  livereload: true
+
+build:
+  minify: true
+  cleanUrls: true
+
+deploy:
+  s3:
+    bucket: "my-site-bucket"
+    region: "us-west-2"
+  cloudfront:
+    distributionId: "E1234567890"
+    invalidatePaths:
+      - "/*"
+
+params:
+  math: false
+  toc: false
