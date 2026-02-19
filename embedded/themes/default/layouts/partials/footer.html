@@ -1,0 +1,11 @@
+<footer class="border-t border-border">
+  <div class="mx-auto max-w-4xl px-4 py-8 text-center text-sm text-muted-foreground">
+    <p>&copy; {{ now.Format "2006" }} {{ .Site.Author.Name }}. All rights reserved.</p>
+    <div class="mt-2 flex justify-center gap-4">
+      {{ if .Site.Author.Social.GitHub }}<a href="https://github.com/{{ .Site.Author.Social.GitHub }}" class="hover:text-foreground">GitHub</a>{{ end }}
+      {{ if .Site.Author.Social.LinkedIn }}<a href="https://linkedin.com/in/{{ .Site.Author.Social.LinkedIn }}" class="hover:text-foreground">LinkedIn</a>{{ end }}
+      {{ if .Site.Author.Social.Twitter }}<a href="https://twitter.com/{{ .Site.Author.Social.Twitter }}" class="hover:text-foreground">Twitter</a>{{ end }}
+      <a href="/rss.xml" class="hover:text-foreground">RSS</a>
+    </div>
+  </div>
+</footer>

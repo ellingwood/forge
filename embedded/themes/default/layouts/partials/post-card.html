@@ -1,0 +1,22 @@
+<article class="card p-6">
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <h3 class="text-lg font-semibold">
+        <a href="{{ .URL }}" class="hover:underline">{{ .Title }}</a>
+      </h3>
+      {{ if .Summary }}<p class="mt-1 text-sm text-muted-foreground">{{ .Summary }}</p>{{ end }}
+      <div class="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
+        {{ if not .Date.IsZero }}<time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "Jan 2, 2006" }}</time>{{ end }}
+        {{ if .ReadingTime }}<span>{{ .ReadingTime }} min read</span>{{ end }}
+      </div>
+    </div>
+    {{ if .Cover }}
+    <img src="{{ .Cover.Image }}" alt="{{ .Cover.Alt }}" class="h-20 w-20 rounded-md object-cover">
+    {{ end }}
+  </div>
+  {{ if .Tags }}
+  <div class="mt-3 flex flex-wrap gap-1">
+    {{ range .Tags }}<span class="badge text-xs">{{ . }}</span>{{ end }}
+  </div>
+  {{ end }}
+</article>

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="{{ .Site.Language }}" class="scroll-smooth">
+<head>
+  {{ block "head" . }}
+    {{ partial "head/meta.html" . }}
+    {{ partial "head/css.html" . }}
+  {{ end }}
+</head>
+<body class="bg-background text-foreground font-sans antialiased min-h-screen flex flex-col">
+  {{ partial "header.html" . }}
+  <main class="flex-1">
+    {{ block "main" . }}{{ end }}
+  </main>
+  {{ partial "footer.html" . }}
+  {{ block "scripts" . }}
+    {{ partial "scripts.html" . }}
+  {{ end }}
+</body>
+</html>
