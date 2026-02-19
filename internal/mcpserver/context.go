@@ -140,6 +140,22 @@ func (sc *SiteContext) AllSeries() []string {
 	return series
 }
 
+// AllProjectSlugs returns all unique slugs of project pages (section=="projects", type==single).
+func (sc *SiteContext) AllProjectSlugs() []string {
+	seen := make(map[string]bool)
+	for _, p := range sc.pages {
+		if p.Section == "projects" && p.Type == content.PageTypeSingle && p.Slug != "" {
+			seen[p.Slug] = true
+		}
+	}
+	slugs := make([]string, 0, len(seen))
+	for s := range seen {
+		slugs = append(slugs, s)
+	}
+	sort.Strings(slugs)
+	return slugs
+}
+
 // SlugifyTitle returns a URL-safe slug from a title.
 func SlugifyTitle(title string) string {
 	return scaffold.Slugify(title)

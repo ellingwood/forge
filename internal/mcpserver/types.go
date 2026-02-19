@@ -17,6 +17,7 @@ type PageBrief struct {
 	Tags        []string  `json:"tags,omitempty"`
 	Categories  []string  `json:"categories,omitempty"`
 	Series      string    `json:"series,omitempty"`
+	Project     string    `json:"project,omitempty"`
 	Summary     string    `json:"summary,omitempty"`
 	Description string    `json:"description,omitempty"`
 	ReadingTime int       `json:"readingTime"`
@@ -172,6 +173,7 @@ type QueryContentInput struct {
 	DateAfter  string   `json:"dateAfter,omitempty"  jsonschema:"Only pages published after this date (ISO 8601)"`
 	DateBefore string   `json:"dateBefore,omitempty" jsonschema:"Only pages published before this date (ISO 8601)"`
 	Series     string   `json:"series,omitempty"     jsonschema:"Filter by series name"`
+	Project    string   `json:"project,omitempty"    jsonschema:"Filter by project slug"`
 	Search     string   `json:"search,omitempty"     jsonschema:"Full-text search across title, summary, and content"`
 	SortBy     string   `json:"sortBy,omitempty"     jsonschema:"Sort field: date, title, weight, readingTime, wordCount (default: date)"`
 	SortOrder  string   `json:"sortOrder,omitempty"  jsonschema:"Sort order: asc or desc (default: desc)"`
@@ -276,6 +278,7 @@ type CreateContentInput struct {
 	Tags        []string       `json:"tags,omitempty"        jsonschema:"Tags to assign"`
 	Categories  []string       `json:"categories,omitempty"  jsonschema:"Categories to assign"`
 	Series      string         `json:"series,omitempty"      jsonschema:"Series name"`
+	Project     string         `json:"project,omitempty"     jsonschema:"Project slug to associate this content with"`
 	Draft       *bool          `json:"draft,omitempty"       jsonschema:"Mark as draft (default: true)"`
 	Description string         `json:"description,omitempty" jsonschema:"Meta description"`
 	Body        string         `json:"body,omitempty"        jsonschema:"Initial Markdown body content"`

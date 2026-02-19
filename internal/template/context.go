@@ -22,6 +22,9 @@ type PageContext struct {
 	Tags            []string
 	Categories      []string
 	Series          string
+	Project         string
+	ProjectPage     *PageContext
+	ProjectPosts    []*PageContext
 	Params          map[string]any
 	Cover           *CoverImage
 	TableOfContents template.HTML

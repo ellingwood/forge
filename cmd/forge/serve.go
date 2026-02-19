@@ -77,20 +77,11 @@ var serveCmd = &cobra.Command{
 		var tailwindCancel func()
 		if _, err := os.Stat(cssInput); err == nil {
 			cssOutput := filepath.Join(outputDir, "css", "style.css")
-			contentPaths := []string{
-				filepath.Join(themePath, "layouts", "**", "*.html"),
-				filepath.Join(projectRoot, "layouts", "**", "*.html"),
-				filepath.Join(projectRoot, "content", "**", "*.md"),
-			}
 			tb := &build.TailwindBuilder{}
-			twConfig := filepath.Join(themePath, "tailwind.config.js")
-			if _, err := os.Stat(twConfig); err == nil {
-				tb.ConfigPath = twConfig
-			}
 			if _, binErr := tb.EnsureBinary(build.TailwindVersion); binErr != nil {
 				log.Printf("warning: could not download Tailwind CSS binary: %v (skipping CSS watch mode)", binErr)
 			} else {
-				cancelFn, watchErr := tb.Watch(cssInput, cssOutput, contentPaths)
+				cancelFn, watchErr := tb.Watch(cssInput, cssOutput, projectRoot)
 				if watchErr != nil {
 					log.Printf("warning: could not start Tailwind CSS watcher: %v", watchErr)
 				} else {

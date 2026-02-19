@@ -78,6 +78,7 @@ type Page struct {
 	Tags       []string
 	Categories []string
 	Series     string
+	Project    string // Slug of the associated project page
 
 	// Navigation
 	PrevPage *Page

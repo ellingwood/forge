@@ -74,6 +74,7 @@ type frontmatterData struct {
 	Tags        []string `yaml:"tags"`
 	Categories  []string `yaml:"categories"`
 	Series      string   `yaml:"series"`
+	Project     string   `yaml:"project"`
 	Description string   `yaml:"description"`
 	Summary     string   `yaml:"summary"`
 	Slug        string   `yaml:"slug"`
@@ -82,7 +83,7 @@ type frontmatterData struct {
 }
 
 // validateFrontmatter validates YAML frontmatter against the Forge schema.
-func validateFrontmatter(raw string, existingTags, existingCats []string) ValidateFrontmatterOutput {
+func validateFrontmatter(raw string, existingTags, existingCats, projectSlugs []string) ValidateFrontmatterOutput {
 	var data frontmatterData
 	var errs []ValidationError
 	var warns []ValidationWarning
@@ -169,6 +170,29 @@ func validateFrontmatter(raw string, existingTags, existingCats []string) Valida
 					Suggestion: s,
 				})
 			}
+		}
+	}
+
+	// Project slug validation
+	if data.Project != "" && len(projectSlugs) > 0 {
+		found := false
+		for _, s := range projectSlugs {
+			if s == data.Project {
+				found = true
+				break
+			}
+		}
+		if !found {
+			similar := findSimilarTerms(data.Project, projectSlugs, 2)
+			w := ValidationWarning{
+				Field:   "project",
+				Message: fmt.Sprintf("Project %q does not match any existing project slug", data.Project),
+			}
+			if len(similar) > 0 {
+				w.Message = fmt.Sprintf("Project %q does not match any existing project slug. Did you mean %q?", data.Project, similar[0])
+				w.Suggestion = similar[0]
+			}
+			warns = append(warns, w)
 		}
 	}
 

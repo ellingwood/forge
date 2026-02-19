@@ -1,4 +1,4 @@
-<article class="card card-hover p-6">
+<article class="card card-hover p-6 flex flex-col h-full">
   <h3 class="text-lg font-semibold mb-2">
     <a href="{{ .URL }}" class="hover:text-primary transition-colors">{{ .Title }}</a>
   </h3>
@@ -6,7 +6,7 @@
   <p class="text-sm text-muted-foreground mb-4">{{ .Description }}</p>
   {{ end }}
   {{ if .Params.tech }}
-  <div class="flex flex-wrap gap-1">
+  <div class="flex flex-wrap gap-1 mt-auto pt-4">
     {{ range .Params.tech }}
     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-secondary text-secondary-foreground">{{ . }}</span>
     {{ end }}

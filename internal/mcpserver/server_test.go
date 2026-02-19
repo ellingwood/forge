@@ -32,6 +32,7 @@ func TestFindSimilarTerms(t *testing.T) {
 func TestValidateFrontmatter(t *testing.T) {
 	tags := []string{"go", "kubernetes", "devops"}
 	cats := []string{"Infrastructure", "Programming"}
+	projects := []string{"forge", "myapp"}
 
 	t.Run("valid frontmatter", func(t *testing.T) {
 		fm := `title: "My Post"
@@ -40,7 +41,7 @@ draft: true
 tags:
   - go
 `
-		result := validateFrontmatter(fm, tags, cats)
+		result := validateFrontmatter(fm, tags, cats, projects)
 		if !result.Valid {
 			t.Errorf("expected valid, got errors: %v", result.Errors)
 		}
@@ -48,7 +49,7 @@ tags:
 
 	t.Run("missing title", func(t *testing.T) {
 		fm := `date: 2025-01-15T10:00:00Z`
-		result := validateFrontmatter(fm, tags, cats)
+		result := validateFrontmatter(fm, tags, cats, projects)
 		if result.Valid {
 			t.Error("expected invalid due to missing title")
 		}
@@ -57,7 +58,7 @@ tags:
 	t.Run("invalid date format", func(t *testing.T) {
 		fm := `title: "My Post"
 date: "January 15, 2025"`
-		result := validateFrontmatter(fm, tags, cats)
+		result := validateFrontmatter(fm, tags, cats, projects)
 		if result.Valid {
 			t.Error("expected invalid due to bad date format")
 		}
@@ -69,9 +70,49 @@ date: 2025-01-15T10:00:00Z
 tags:
   - k8s
 `
-		result := validateFrontmatter(fm, tags, cats)
+		result := validateFrontmatter(fm, tags, cats, projects)
 		if len(result.Warnings) == 0 {
 			t.Error("expected warning for k8s similar to kubernetes")
+		}
+	})
+
+	t.Run("unknown project slug warning", func(t *testing.T) {
+		fm := `title: "My Post"
+date: 2025-01-15T10:00:00Z
+project: "nonexistent"
+`
+		result := validateFrontmatter(fm, tags, cats, projects)
+		if !result.Valid {
+			t.Errorf("expected valid (project mismatch is a warning, not error), got errors: %v", result.Errors)
+		}
+		if len(result.Warnings) == 0 {
+			t.Error("expected warning for unknown project slug")
+		}
+		foundProjectWarning := false
+		for _, w := range result.Warnings {
+			if w.Field == "project" {
+				foundProjectWarning = true
+				break
+			}
+		}
+		if !foundProjectWarning {
+			t.Error("expected a warning with field 'project'")
+		}
+	})
+
+	t.Run("valid project slug no warning", func(t *testing.T) {
+		fm := `title: "My Post"
+date: 2025-01-15T10:00:00Z
+project: "forge"
+`
+		result := validateFrontmatter(fm, tags, cats, projects)
+		if !result.Valid {
+			t.Errorf("expected valid, got errors: %v", result.Errors)
+		}
+		for _, w := range result.Warnings {
+			if w.Field == "project" {
+				t.Errorf("unexpected project warning: %s", w.Message)
+			}
 		}
 	})
 }

@@ -142,6 +142,11 @@ func PopulatePage(page *Page, metadata map[string]any) error {
 			page.Series = s
 		}
 	}
+	if v, ok := metadata["project"]; ok {
+		if s, ok := v.(string); ok {
+			page.Project = s
+		}
+	}
 
 	// Boolean fields.
 	if v, ok := metadata["draft"]; ok {

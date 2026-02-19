@@ -12,12 +12,11 @@ import (
 )
 
 // TailwindVersion is the version of the Tailwind CSS standalone CLI to use.
-const TailwindVersion = "3.4.17"
+const TailwindVersion = "4.2.0"
 
 // TailwindBuilder manages the Tailwind CSS standalone CLI binary.
 type TailwindBuilder struct {
-	BinDir     string // directory where the binary is cached (default: ~/.forge/bin/)
-	ConfigPath string // optional path to tailwind.config.js; passed as --config if set
+	BinDir string // directory where the binary is cached (default: ~/.forge/bin/)
 }
 
 // BinaryName returns the filename of the tailwindcss binary for the current
@@ -78,15 +77,27 @@ func (tb *TailwindBuilder) BinaryPath() string {
 	return filepath.Join(binDir, BinaryName())
 }
 
-// EnsureBinary checks if the Tailwind binary exists and is executable.
-// If not, it downloads it from GitHub releases. Returns the path to the binary.
+// versionMarkerPath returns the path to the version marker file that tracks
+// which version of the Tailwind binary is currently installed.
+func (tb *TailwindBuilder) versionMarkerPath() string {
+	return tb.BinaryPath() + ".version"
+}
+
+// EnsureBinary checks if the Tailwind binary exists, is executable, and matches
+// the requested version. If the version doesn't match or the binary is missing,
+// it downloads it from GitHub releases. Returns the path to the binary.
 func (tb *TailwindBuilder) EnsureBinary(version string) (string, error) {
 	binPath := tb.BinaryPath()
+	markerPath := tb.versionMarkerPath()
 
 	// Check if binary already exists and is executable.
 	info, err := os.Stat(binPath)
 	if err == nil && !info.IsDir() && info.Mode()&0111 != 0 {
-		return binPath, nil
+		// Check version marker matches requested version.
+		if marker, err := os.ReadFile(markerPath); err == nil && strings.TrimSpace(string(marker)) == version {
+			return binPath, nil
+		}
+		// Version mismatch or no marker — re-download.
 	}
 
 	// Create BinDir if needed.
@@ -128,24 +139,24 @@ func (tb *TailwindBuilder) EnsureBinary(version string) (string, error) {
 		return "", fmt.Errorf("making binary executable: %w", err)
 	}
 
+	// Write version marker so we can detect stale binaries.
+	_ = os.WriteFile(markerPath, []byte(version), 0o644)
+
 	return binPath, nil
 }
 
 // Build runs the Tailwind CLI in production mode with --minify.
 // input is the path to the input CSS file (e.g., themes/default/static/css/globals.css)
 // output is the path to write the compiled CSS (e.g., public/css/style.css)
-// contentPaths are glob patterns for content files to scan for class usage.
-func (tb *TailwindBuilder) Build(input, output string, contentPaths []string) error {
+// cwd is the project root used for automatic content detection via --cwd.
+func (tb *TailwindBuilder) Build(input, output, cwd string) error {
 	binPath := tb.BinaryPath()
 
 	args := []string{
 		"-i", input,
 		"-o", output,
-		"--content", strings.Join(contentPaths, ","),
+		"--cwd", cwd,
 		"--minify",
-	}
-	if tb.ConfigPath != "" {
-		args = append(args, "--config", tb.ConfigPath)
 	}
 
 	cmd := exec.Command(binPath, args...)
@@ -160,17 +171,15 @@ func (tb *TailwindBuilder) Build(input, output string, contentPaths []string) er
 
 // Watch runs the Tailwind CLI in watch mode for development.
 // It returns a cancel function to stop the watcher.
-func (tb *TailwindBuilder) Watch(input, output string, contentPaths []string) (cancel func(), err error) {
+// cwd is the project root used for automatic content detection via --cwd.
+func (tb *TailwindBuilder) Watch(input, output, cwd string) (cancel func(), err error) {
 	binPath := tb.BinaryPath()
 
 	args := []string{
 		"-i", input,
 		"-o", output,
-		"--content", strings.Join(contentPaths, ","),
+		"--cwd", cwd,
 		"--watch",
-	}
-	if tb.ConfigPath != "" {
-		args = append(args, "--config", tb.ConfigPath)
 	}
 
 	cmd := exec.Command(binPath, args...)

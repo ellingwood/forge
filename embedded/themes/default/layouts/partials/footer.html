@@ -5,7 +5,9 @@
       {{ if .Site.Author.Social.GitHub }}<a href="https://github.com/{{ .Site.Author.Social.GitHub }}" class="hover:text-foreground">GitHub</a>{{ end }}
       {{ if .Site.Author.Social.LinkedIn }}<a href="https://linkedin.com/in/{{ .Site.Author.Social.LinkedIn }}" class="hover:text-foreground">LinkedIn</a>{{ end }}
       {{ if .Site.Author.Social.Twitter }}<a href="https://twitter.com/{{ .Site.Author.Social.Twitter }}" class="hover:text-foreground">Twitter</a>{{ end }}
-      <a href="/rss.xml" class="hover:text-foreground">RSS</a>
+      {{ if .Site.Author.Social.Mastodon }}<a href="{{ .Site.Author.Social.Mastodon }}" rel="me" class="hover:text-foreground">Mastodon</a>{{ end }}
+      {{ if .Site.Author.Email }}<a href="mailto:{{ .Site.Author.Email }}" class="hover:text-foreground">Email</a>{{ end }}
+      <a href="/index.xml" class="hover:text-foreground">RSS</a>
     </div>
   </div>
 </footer>

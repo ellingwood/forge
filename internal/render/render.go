@@ -60,6 +60,7 @@ func (r *Renderer) buildPageContext(page *content.Page, allPages []*content.Page
 		Tags:            page.Tags,
 		Categories:      page.Categories,
 		Series:          page.Series,
+		Project:         page.Project,
 		Params:          page.Params,
 		TableOfContents: template.HTML(page.TableOfContents),
 		Section:         page.Section,

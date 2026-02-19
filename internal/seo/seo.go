@@ -186,6 +186,47 @@ func JSONLDArticle(meta PageMeta) string {
 	return fmt.Sprintf(`<script type="application/ld+json">%s</script>`, string(data))
 }
 
+// ManifestOptions holds inputs for generating a Web App Manifest (manifest.json).
+type ManifestOptions struct {
+	Name        string
+	ShortName   string
+	Description string
+	StartURL    string
+	ThemeColor  string
+	BgColor     string
+}
+
+// GenerateManifest produces a standards-compliant Web App Manifest (manifest.json).
+// See https://developer.mozilla.org/en-US/docs/Web/Manifest
+func GenerateManifest(opts ManifestOptions) ([]byte, error) {
+	if opts.StartURL == "" {
+		opts.StartURL = "/"
+	}
+	if opts.ThemeColor == "" {
+		opts.ThemeColor = "#ffffff"
+	}
+	if opts.BgColor == "" {
+		opts.BgColor = "#ffffff"
+	}
+
+	manifest := map[string]any{
+		"name":             opts.Name,
+		"short_name":       opts.ShortName,
+		"description":      opts.Description,
+		"start_url":        opts.StartURL,
+		"display":          "standalone",
+		"theme_color":      opts.ThemeColor,
+		"background_color": opts.BgColor,
+	}
+
+	data, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("seo: marshaling manifest: %w", err)
+	}
+	data = append(data, '\n')
+	return data, nil
+}
+
 // CanonicalURL returns a <link rel="canonical"> tag for the given permalink.
 func CanonicalURL(permalink string) string {
 	return fmt.Sprintf(`<link rel="canonical" href="%s">`, html.EscapeString(permalink))

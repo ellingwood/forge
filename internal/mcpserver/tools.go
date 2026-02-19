@@ -19,47 +19,92 @@ import (
 func (fs *ForgeServer) registerTools() {
 	mcp.AddTool(fs.server, &mcp.Tool{
 		Name:        "query_content",
-		Description: "Filter and sort content pages by section, tags, date, draft status, and more",
+		Description: "Search and filter the site's content pages. Returns matching pages sorted by date, title, or weight. Filter by section (blog, projects), tags, categories, series, date range, draft status, and full-text search.",
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(false),
+			Title:         "Query Content",
+		},
 	}, fs.handleQueryContent)
 
 	mcp.AddTool(fs.server, &mcp.Tool{
 		Name:        "get_page",
-		Description: "Get full detail for a single page by path or URL",
+		Description: "Get the full detail for a single content page including its Markdown body, frontmatter, word count, reading time, and resolved URL. Look up by source file path or output URL.",
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(false),
+			Title:         "Get Page",
+		},
 	}, fs.handleGetPage)
 
 	mcp.AddTool(fs.server, &mcp.Tool{
 		Name:        "list_drafts",
-		Description: "List all draft content across all sections",
+		Description: "List all draft content across all sections, or filter to a specific section. Returns each draft's title, path, date, and tags.",
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(false),
+			Title:         "List Drafts",
+		},
 	}, fs.handleListDrafts)
 
 	mcp.AddTool(fs.server, &mcp.Tool{
 		Name:        "validate_frontmatter",
-		Description: "Validate a frontmatter YAML string against the Forge schema",
+		Description: "Validate a YAML frontmatter string against the Forge schema. Checks required fields, date formats, and warns about similar or new taxonomy terms (tags/categories).",
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(false),
+			Title:         "Validate Frontmatter",
+		},
 	}, fs.handleValidateFrontmatter)
 
 	mcp.AddTool(fs.server, &mcp.Tool{
 		Name:        "get_template_context",
-		Description: "Show what data a specific template receives at render time",
+		Description: "Show what template data a specific content page receives at render time. Returns the resolved layout, base template, available blocks, template context variables, and template functions.",
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(false),
+			Title:         "Get Template Context",
+		},
 	}, fs.handleGetTemplateContext)
 
 	mcp.AddTool(fs.server, &mcp.Tool{
 		Name:        "resolve_layout",
-		Description: "Show which layout file a given content page will use",
+		Description: "Show which layout template file a given content page will use, including the full lookup order, base template, and available blocks.",
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(false),
+			Title:         "Resolve Layout",
+		},
 	}, fs.handleResolveLayout)
 
 	mcp.AddTool(fs.server, &mcp.Tool{
 		Name:        "create_content",
-		Description: "Scaffold a new content file with valid frontmatter",
+		Description: "Create a new blog post, page, or project. Writes a Markdown file with valid frontmatter to the content directory. Supports tags, categories, series, page bundles, and custom params.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(false),
+			OpenWorldHint:   ptr(false),
+			Title:           "Create Content",
+		},
 	}, fs.handleCreateContent)
 
 	mcp.AddTool(fs.server, &mcp.Tool{
 		Name:        "build_site",
-		Description: "Trigger a full site build and return structured results",
+		Description: "Build the site. Renders all content to HTML and writes the output to the public/ directory. Returns build duration, page count, and any errors.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(false),
+			IdempotentHint:  true,
+			OpenWorldHint:   ptr(false),
+			Title:           "Build Site",
+		},
 	}, fs.handleBuildSite)
 
 	mcp.AddTool(fs.server, &mcp.Tool{
 		Name:        "deploy_site",
-		Description: "Deploy the site to S3 + CloudFront",
+		Description: "Deploy the built site to S3 + CloudFront. Syncs the public/ directory to the configured S3 bucket with content-hash diffing and issues a CloudFront cache invalidation. Requires AWS credentials configured in the environment.",
+		Annotations: &mcp.ToolAnnotations{
+			IdempotentHint: true,
+			Title:          "Deploy Site",
+		},
 	}, fs.handleDeploySite)
 }
 
@@ -174,9 +219,10 @@ func (fs *ForgeServer) handleValidateFrontmatter(ctx context.Context, req *mcp.C
 	sc.mu.RLock()
 	existingTags := sc.AllTags()
 	existingCats := sc.AllCategories()
+	projectSlugs := sc.AllProjectSlugs()
 	sc.mu.RUnlock()
 
-	result := validateFrontmatter(input.Frontmatter, existingTags, existingCats)
+	result := validateFrontmatter(input.Frontmatter, existingTags, existingCats, projectSlugs)
 	return nil, result, nil
 }
 
@@ -219,6 +265,7 @@ func (fs *ForgeServer) handleGetTemplateContext(ctx context.Context, req *mcp.Ca
 			"Tags":        target.Tags,
 			"Categories":  target.Categories,
 			"Series":      target.Series,
+			"Project":     target.Project,
 			"ReadingTime": target.ReadingTime,
 			"WordCount":   target.WordCount,
 			"URL":         target.URL,
@@ -273,6 +320,7 @@ func (fs *ForgeServer) handleCreateContent(ctx context.Context, req *mcp.CallToo
 	sc.mu.RLock()
 	existingTags := sc.AllTags()
 	existingCats := sc.AllCategories()
+	projectSlugs := sc.AllProjectSlugs()
 	sc.mu.RUnlock()
 
 	slug := input.Slug
@@ -347,6 +395,14 @@ func (fs *ForgeServer) handleCreateContent(ctx context.Context, req *mcp.CallToo
 		}
 		if !containsStr(existingCats, c) {
 			warnings = append(warnings, fmt.Sprintf("Category %q is new and will create a new taxonomy term", c))
+		}
+	}
+	if input.Project != "" && !containsStr(projectSlugs, input.Project) {
+		similar := findSimilarTerms(input.Project, projectSlugs, 2)
+		if len(similar) > 0 {
+			warnings = append(warnings, fmt.Sprintf("Project %q not found. Did you mean %q?", input.Project, similar[0]))
+		} else {
+			warnings = append(warnings, fmt.Sprintf("Project %q does not match any existing project slug", input.Project))
 		}
 	}
 
@@ -495,6 +551,9 @@ func filterPages(pages []*content.Page, input QueryContentInput) []*content.Page
 			continue
 		}
 		if input.Series != "" && p.Series != input.Series {
+			continue
+		}
+		if input.Project != "" && p.Project != input.Project {
 			continue
 		}
 		if input.DateAfter != "" {
@@ -662,6 +721,9 @@ func buildFrontmatterYAML(input CreateContentInput, slug string, isDraft bool, n
 	}
 	if input.Series != "" {
 		sb.WriteString(fmt.Sprintf("series: %q\n", input.Series))
+	}
+	if input.Project != "" {
+		sb.WriteString(fmt.Sprintf("project: %q\n", input.Project))
 	}
 	if input.Description != "" {
 		sb.WriteString(fmt.Sprintf("description: %q\n", input.Description))

@@ -176,9 +176,10 @@ func (fs *ForgeServer) handleFrontmatterSchemaResource(ctx context.Context, req 
 	tags := sc.AllTags()
 	cats := sc.AllCategories()
 	series := sc.AllSeries()
+	projects := sc.AllProjectSlugs()
 	sc.mu.RUnlock()
 
-	schema := buildFrontmatterSchema(tags, cats, series)
+	schema := buildFrontmatterSchema(tags, cats, series, projects)
 	return marshalResource(req.Params.URI, schema)
 }
 
@@ -263,6 +264,7 @@ func toPageBrief(p *content.Page) PageBrief {
 		Tags:        p.Tags,
 		Categories:  p.Categories,
 		Series:      p.Series,
+		Project:     p.Project,
 		Summary:     p.Summary,
 		Description: p.Description,
 		ReadingTime: p.ReadingTime,
@@ -511,7 +513,7 @@ func buildTemplateInventory(siteDir string) TemplateInventory {
 	return inv
 }
 
-func buildFrontmatterSchema(tags, cats, series []string) FrontmatterSchema {
+func buildFrontmatterSchema(tags, cats, series, projects []string) FrontmatterSchema {
 	return FrontmatterSchema{
 		Required: []string{"title"},
 		Fields: map[string]FieldSchema{
@@ -547,6 +549,12 @@ func buildFrontmatterSchema(tags, cats, series []string) FrontmatterSchema {
 				Description:    "Group related posts into a named series",
 				Default:        nil,
 				ExistingValues: series,
+			},
+			"project": {
+				Type:           "string",
+				Description:    "Associate this post with a project page by slug",
+				Default:        nil,
+				ExistingValues: projects,
 			},
 			"cover": {
 				Type:        "object",

@@ -231,6 +231,11 @@ func TestPopulatePage(t *testing.T) {
 		t.Errorf("Series = %q, want %q", page.Series, "Go Basics")
 	}
 
+	// Project (not in test fixture, should be empty).
+	if page.Project != "" {
+		t.Errorf("Project = %q, want empty (not in test data)", page.Project)
+	}
+
 	// Tags.
 	wantTags := []string{"go", "programming", "tutorial"}
 	if !equalStrings(page.Tags, wantTags) {
@@ -416,6 +421,35 @@ func TestPopulatePageCover(t *testing.T) {
 		}
 		if page.Cover.Alt != "" {
 			t.Errorf("Cover.Alt = %q, want empty", page.Cover.Alt)
+		}
+	})
+}
+
+func TestPopulatePageProject(t *testing.T) {
+	t.Run("with project", func(t *testing.T) {
+		metadata := map[string]any{
+			"title":   "Project Post",
+			"project": "forge",
+		}
+		page := &Page{}
+		if err := PopulatePage(page, metadata); err != nil {
+			t.Fatalf("PopulatePage() error = %v", err)
+		}
+		if page.Project != "forge" {
+			t.Errorf("Project = %q, want %q", page.Project, "forge")
+		}
+	})
+
+	t.Run("without project", func(t *testing.T) {
+		metadata := map[string]any{
+			"title": "No Project Post",
+		}
+		page := &Page{}
+		if err := PopulatePage(page, metadata); err != nil {
+			t.Fatalf("PopulatePage() error = %v", err)
+		}
+		if page.Project != "" {
+			t.Errorf("Project = %q, want empty", page.Project)
 		}
 	})
 }

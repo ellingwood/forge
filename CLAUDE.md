@@ -9,11 +9,8 @@ Before reading files or exploring directories, always use qmd to search for info
 Available tools:
 
 - `qmd search “query”` — fast keyword search (BM25)
-
 - `qmd query “query”` — hybrid search with reranking (best quality)
-
 - `qmd vsearch “query”` — semantic vector search
-
 - `qmd get <file>` — retrieve a specific document
 
 Use qmd search for quick lookups and qmd query for complex questions.
@@ -22,7 +19,7 @@ Use Read/Glob only if qmd doesn’t return enough results.
 
 ## Project Structure
 
-```
+```tree
 forge/
 ├── cmd/forge/          # CLI entry points (cobra commands)
 │   ├── main.go

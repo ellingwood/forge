@@ -125,6 +125,10 @@ func TestEnsureBinary_AlreadyExists(t *testing.T) {
 	if err := os.WriteFile(binPath, []byte("#!/bin/sh\necho fake"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	// Write a matching version marker.
+	if err := os.WriteFile(tb.versionMarkerPath(), []byte("4.1.0"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	// EnsureBinary should return the path without attempting a download.
 	got, err := tb.EnsureBinary("4.1.0")
@@ -142,6 +146,29 @@ func TestEnsureBinary_AlreadyExists(t *testing.T) {
 	}
 	if string(data) != "#!/bin/sh\necho fake" {
 		t.Error("binary file content was modified; expected no download")
+	}
+}
+
+func TestEnsureBinary_VersionMismatch(t *testing.T) {
+	binDir := t.TempDir()
+	tb := &TailwindBuilder{BinDir: binDir}
+
+	// Create a fake binary at the expected path.
+	binPath := tb.BinaryPath()
+	if err := os.WriteFile(binPath, []byte("#!/bin/sh\necho fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Write a mismatched version marker (old version).
+	if err := os.WriteFile(tb.versionMarkerPath(), []byte("3.4.17"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// EnsureBinary should attempt to download because version doesn't match.
+	// Since we use a non-existent version, it will fail — this verifies the
+	// version check triggers a re-download.
+	_, err := tb.EnsureBinary("0.0.0-nonexistent")
+	if err == nil {
+		t.Error("EnsureBinary() should have returned an error when downloading a non-existent version")
 	}
 }
 
@@ -184,9 +211,9 @@ func TestBuild_CommandArgs(t *testing.T) {
 
 	input := "/path/to/input.css"
 	output := "/path/to/output.css"
-	contentPaths := []string{"./content/**/*.html", "./layouts/**/*.html"}
+	cwd := "/path/to/project"
 
-	err := tb.Build(input, output, contentPaths)
+	err := tb.Build(input, output, cwd)
 	if err != nil {
 		t.Fatalf("Build() error: %v", err)
 	}
@@ -206,11 +233,18 @@ func TestBuild_CommandArgs(t *testing.T) {
 	if !strings.Contains(args, "-o "+output) {
 		t.Errorf("args %q missing \"-o %s\"", args, output)
 	}
-	if !strings.Contains(args, "--content "+strings.Join(contentPaths, ",")) {
-		t.Errorf("args %q missing \"--content %s\"", args, strings.Join(contentPaths, ","))
+	if !strings.Contains(args, "--cwd "+cwd) {
+		t.Errorf("args %q missing \"--cwd %s\"", args, cwd)
 	}
 	if !strings.Contains(args, "--minify") {
 		t.Errorf("args %q missing \"--minify\"", args)
+	}
+	// v4 should NOT have --content or --config flags.
+	if strings.Contains(args, "--content") {
+		t.Errorf("args %q should not contain \"--content\" (v4 uses automatic content detection)", args)
+	}
+	if strings.Contains(args, "--config") {
+		t.Errorf("args %q should not contain \"--config\" (v4 uses CSS-first config)", args)
 	}
 }
 
@@ -234,9 +268,9 @@ func TestWatch_StartsAndStops(t *testing.T) {
 
 	input := "/path/to/input.css"
 	output := "/path/to/output.css"
-	contentPaths := []string{"./content/**/*.html"}
+	cwd := "/path/to/project"
 
-	cancel, err := tb.Watch(input, output, contentPaths)
+	cancel, err := tb.Watch(input, output, cwd)
 	if err != nil {
 		t.Fatalf("Watch() error: %v", err)
 	}
@@ -314,9 +348,9 @@ func TestWatch_CommandArgs(t *testing.T) {
 
 	input := "/path/to/input.css"
 	output := "/path/to/output.css"
-	contentPaths := []string{"./templates/**/*.html", "./src/**/*.js"}
+	cwd := "/path/to/project"
 
-	cancel, err := tb.Watch(input, output, contentPaths)
+	cancel, err := tb.Watch(input, output, cwd)
 	if err != nil {
 		t.Fatalf("Watch() error: %v", err)
 	}
@@ -351,7 +385,14 @@ func TestWatch_CommandArgs(t *testing.T) {
 	if !strings.Contains(args, "-o "+output) {
 		t.Errorf("watch args %q missing \"-o %s\"", args, output)
 	}
-	if !strings.Contains(args, "--content "+strings.Join(contentPaths, ",")) {
-		t.Errorf("watch args %q missing \"--content %s\"", args, strings.Join(contentPaths, ","))
+	if !strings.Contains(args, "--cwd "+cwd) {
+		t.Errorf("watch args %q missing \"--cwd %s\"", args, cwd)
+	}
+	// v4 should NOT have --content or --config flags.
+	if strings.Contains(args, "--content") {
+		t.Errorf("watch args %q should not contain \"--content\" (v4 uses automatic content detection)", args)
+	}
+	if strings.Contains(args, "--config") {
+		t.Errorf("watch args %q should not contain \"--config\" (v4 uses CSS-first config)", args)
 	}
 }

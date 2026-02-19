@@ -101,3 +101,30 @@ func buildTaxonomyMaps(pages []*content.Page) (tags map[string][]*content.Page, 
 	}
 	return tags, categories
 }
+
+// buildProjectPostMap maps project slug to posts that reference that project,
+// sorted newest-first by date.
+func buildProjectPostMap(pages []*content.Page) map[string][]*content.Page {
+	m := make(map[string][]*content.Page)
+	for _, p := range pages {
+		if p.Project != "" {
+			m[p.Project] = append(m[p.Project], p)
+		}
+	}
+	// Sort each project's posts newest-first.
+	for _, posts := range m {
+		content.SortByDate(posts, false)
+	}
+	return m
+}
+
+// buildProjectPageIndex maps project slug to its Page (section=="projects", type==Single).
+func buildProjectPageIndex(pages []*content.Page) map[string]*content.Page {
+	m := make(map[string]*content.Page)
+	for _, p := range pages {
+		if p.Section == "projects" && p.Type == content.PageTypeSingle {
+			m[p.Slug] = p
+		}
+	}
+	return m
+}

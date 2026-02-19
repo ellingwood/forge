@@ -308,27 +308,41 @@ func (b *Builder) Build() (*BuildResult, error) {
 	cssInput := filepath.Join(themePath, "static", "css", "globals.css")
 	if _, err := os.Stat(cssInput); err == nil {
 		cssOutput := filepath.Join(outputDir, "css", "style.css")
-		contentPaths := []string{
-			filepath.Join(themePath, "layouts", "**", "*.html"),
-			filepath.Join(projectRoot, "layouts", "**", "*.html"),
-			filepath.Join(contentDir, "**", "*.md"),
-		}
 		tb := &TailwindBuilder{}
-		twConfig := filepath.Join(themePath, "tailwind.config.js")
-		if _, err := os.Stat(twConfig); err == nil {
-			tb.ConfigPath = twConfig
-		}
 		if _, binErr := tb.EnsureBinary(TailwindVersion); binErr != nil {
 			fmt.Fprintf(os.Stderr, "warning: could not download Tailwind CSS binary: %v (skipping CSS compilation)\n", binErr)
 		} else {
 			if err := os.MkdirAll(filepath.Dir(cssOutput), 0o755); err != nil {
 				return nil, fmt.Errorf("creating CSS output directory: %w", err)
 			}
-			if err := tb.Build(cssInput, cssOutput, contentPaths); err != nil {
+			if err := tb.Build(cssInput, cssOutput, projectRoot); err != nil {
 				return nil, fmt.Errorf("building Tailwind CSS: %w", err)
 			}
 			result.StaticFiles++
 		}
+
+		// Append syntax highlighting CSS (Chroma) to the compiled stylesheet.
+		lightStyle := b.config.Highlight.Style
+		darkStyle := b.config.Highlight.DarkStyle
+		if lightStyle == "" {
+			lightStyle = "github"
+		}
+		if darkStyle == "" {
+			darkStyle = "github-dark"
+		}
+		lightCSS, darkCSS, chromaErr := content.GenerateChromaCSS(lightStyle, darkStyle)
+		if chromaErr != nil {
+			return nil, fmt.Errorf("generating syntax highlight CSS: %w", chromaErr)
+		}
+		cssFile, err := os.OpenFile(cssOutput, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+		if err != nil {
+			return nil, fmt.Errorf("opening CSS for chroma append: %w", err)
+		}
+		if _, err := cssFile.WriteString(lightCSS + "\n" + darkCSS); err != nil {
+			cssFile.Close()
+			return nil, fmt.Errorf("writing syntax highlight CSS: %w", err)
+		}
+		cssFile.Close()
 	}
 
 	// Step 12: Copy page bundle assets.
@@ -380,6 +394,25 @@ func (b *Builder) Build() (*BuildResult, error) {
 	robotsData := seo.GenerateRobotsTxt(sitemapURL)
 	if err := writeDirectFile(outputDir, "robots.txt", robotsData); err != nil {
 		return nil, fmt.Errorf("writing robots.txt: %w", err)
+	}
+	result.StaticFiles++
+
+	// Generate manifest.json (Web App Manifest).
+	shortName := b.config.Title
+	if len(shortName) > 12 {
+		shortName = shortName[:12]
+	}
+	manifestData, err := seo.GenerateManifest(seo.ManifestOptions{
+		Name:        b.config.Title,
+		ShortName:   shortName,
+		Description: b.config.Description,
+		StartURL:    "/",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("generating manifest.json: %w", err)
+	}
+	if err := writeDirectFile(outputDir, "manifest.json", manifestData); err != nil {
+		return nil, fmt.Errorf("writing manifest.json: %w", err)
 	}
 	result.StaticFiles++
 
@@ -651,6 +684,33 @@ func (b *Builder) buildPageContexts(pages []*content.Page, siteCtx *tmpl.SiteCon
 			}
 		}
 	}
+
+	// Wire up project <-> post bidirectional linking.
+	projectPostMap := buildProjectPostMap(pages)
+	projectPageIndex := buildProjectPageIndex(pages)
+
+	for _, p := range pages {
+		ctx := m[p]
+		// For posts that reference a project: resolve ProjectPage.
+		if p.Project != "" {
+			if projPage, ok := projectPageIndex[p.Project]; ok {
+				if projCtx, ok := m[projPage]; ok {
+					ctx.ProjectPage = projCtx
+				}
+			}
+		}
+		// For project pages: populate ProjectPosts.
+		if p.Section == "projects" && p.Type == content.PageTypeSingle {
+			if posts, ok := projectPostMap[p.Slug]; ok {
+				for _, post := range posts {
+					if postCtx, ok := m[post]; ok {
+						ctx.ProjectPosts = append(ctx.ProjectPosts, postCtx)
+					}
+				}
+			}
+		}
+	}
+
 	return m
 }
 
@@ -682,6 +742,7 @@ func pageToContext(p *content.Page, siteCtx *tmpl.SiteContext) *tmpl.PageContext
 		Tags:            p.Tags,
 		Categories:      p.Categories,
 		Series:          p.Series,
+		Project:         p.Project,
 		Params:          p.Params,
 		TableOfContents: template.HTML(p.TableOfContents),
 		Section:         p.Section,

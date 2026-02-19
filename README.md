@@ -177,7 +177,50 @@ Forge ships an [MCP](https://modelcontextprotocol.io) server that gives AI clien
 }
 ```
 
-The server exposes resources (site config, pages, taxonomies), tools (query content, create content, trigger builds), and prompt templates.
+### Tools
+
+| Tool | Description |
+| ------ | ------------- |
+| `query_content` | Search and filter pages by section, tags, categories, date range, draft status, and full-text search |
+| `get_page` | Get full detail for a single page (frontmatter, Markdown body, word count, reading time) |
+| `list_drafts` | List all draft content across all sections |
+| `validate_frontmatter` | Validate a YAML frontmatter string against the Forge schema |
+| `get_template_context` | Show what data a specific template receives at render time |
+| `resolve_layout` | Show which layout file a given content page will use |
+| `create_content` | **Write** — Create a new blog post, page, or project with frontmatter and Markdown body |
+| `build_site` | **Write** — Render all content to HTML in `public/` |
+| `deploy_site` | **Write** — Deploy `public/` to S3 + CloudFront |
+
+### Resources
+
+| URI | Description |
+| ----- | ------------- |
+| `forge://config` | Fully resolved site configuration |
+| `forge://pages` | All content pages with metadata |
+| `forge://taxonomies` | Tags, categories, and series with page counts |
+| `forge://build/status` | Last build result (subscribable) |
+
+### Prompt Templates
+
+| Prompt | Description |
+| -------- | ------------- |
+| `new_blog_post` | Walk through creating a blog post with proper frontmatter |
+| `fix_build_errors` | Diagnose and fix site build errors |
+| `content_calendar` | Plan a content calendar based on existing posts |
+
+### Recommended CLAUDE.md snippet
+
+Add this to your site's `CLAUDE.md` so Claude knows about the write tools:
+
+```markdown
+## Forge MCP
+
+This project uses the Forge static site generator with an MCP server (`forge mcp`).
+
+Use `create_content` to create new blog posts, pages, and projects — it writes
+Markdown files with valid frontmatter. Use `build_site` to render the site.
+Use `query_content` and `get_page` to explore existing content.
+```
 
 ## Deployment
 
