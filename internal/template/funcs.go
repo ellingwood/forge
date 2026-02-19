@@ -92,10 +92,19 @@ func markdownify(s string) template.HTML {
 	return template.HTML(result)
 }
 
-// plainify strips HTML tags from a string.
-func plainify(s string) string {
+// plainify strips HTML tags from a string or template.HTML value.
+func plainify(s any) string {
+	var str string
+	switch v := s.(type) {
+	case template.HTML:
+		str = string(v)
+	case string:
+		str = v
+	default:
+		str = fmt.Sprintf("%v", v)
+	}
 	re := regexp.MustCompile(`<[^>]*>`)
-	return re.ReplaceAllString(s, "")
+	return re.ReplaceAllString(str, "")
 }
 
 // truncate truncates a string to n characters, appending "..." if truncated.

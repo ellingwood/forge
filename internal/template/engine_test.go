@@ -322,7 +322,7 @@ func TestFuncMap(t *testing.T) {
 	})
 
 	t.Run("plainify", func(t *testing.T) {
-		fn := fm["plainify"].(func(string) string)
+		fn := fm["plainify"].(func(any) string)
 		got := fn("<p>Hello <strong>World</strong></p>")
 		want := "Hello World"
 		if got != want {
