@@ -56,10 +56,7 @@ func CalculateReadingTime(content string) int {
 	if wc == 0 {
 		return 0
 	}
-	minutes := wc / 200
-	if minutes < 1 {
-		minutes = 1
-	}
+	minutes := max(wc/200, 1)
 	return minutes
 }
 

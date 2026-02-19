@@ -32,7 +32,7 @@ const liveReloadScript = `<script>
 // document. If a </body> tag is found, the script is inserted immediately
 // before it. Otherwise the script is appended to the end of the document.
 func InjectLiveReload(html []byte, port int) []byte {
-	script := []byte(fmt.Sprintf(liveReloadScript, port))
+	script := fmt.Appendf(nil, liveReloadScript, port)
 
 	idx := bytes.LastIndex(html, []byte("</body>"))
 	if idx == -1 {

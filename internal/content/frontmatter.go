@@ -59,13 +59,13 @@ func ParseFrontmatter(raw []byte) (metadata map[string]any, body []byte, err err
 	rest = rest[nlIdx+1:]
 
 	// Find the closing delimiter.
-	closingIdx := bytes.Index(rest, delimiter)
-	if closingIdx == -1 {
+	before, after, ok := bytes.Cut(rest, delimiter)
+	if !ok {
 		return nil, raw, fmt.Errorf("closing frontmatter delimiter %q not found", string(delimiter))
 	}
 
-	frontmatterContent := rest[:closingIdx]
-	afterClosing := rest[closingIdx+len(delimiter):]
+	frontmatterContent := before
+	afterClosing := after
 
 	// Skip to end of closing delimiter line.
 	nlIdx = bytes.IndexByte(afterClosing, '\n')

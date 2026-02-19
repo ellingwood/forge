@@ -3,6 +3,7 @@ package content
 import (
 	"path/filepath"
 	"runtime"
+	"slices"
 	"testing"
 
 	"github.com/aellingwood/forge/internal/config"
@@ -152,13 +153,7 @@ func TestDiscoverPageBundle(t *testing.T) {
 	}
 
 	// Verify BundleFiles contains diagram.png
-	found := false
-	for _, f := range bundled.BundleFiles {
-		if f == "diagram.png" {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(bundled.BundleFiles, "diagram.png")
 	if !found {
 		t.Errorf("bundled post BundleFiles = %v, want to contain \"diagram.png\"", bundled.BundleFiles)
 	}

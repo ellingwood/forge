@@ -359,8 +359,8 @@ func TestWatcher_Debouncing(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// Make several rapid changes.
-	for i := 0; i < 5; i++ {
-		if err := os.WriteFile(testFile, []byte(fmt.Sprintf("change %d", i)), 0o644); err != nil {
+	for i := range 5 {
+		if err := os.WriteFile(testFile, fmt.Appendf(nil, "change %d", i), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		time.Sleep(10 * time.Millisecond)

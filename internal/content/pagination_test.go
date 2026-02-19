@@ -8,7 +8,7 @@ import (
 // makePages creates n pages with sequential titles for testing pagination.
 func makePages(n int) []*Page {
 	pages := make([]*Page, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		pages[i] = &Page{Title: fmt.Sprintf("Page %d", i+1)}
 	}
 	return pages

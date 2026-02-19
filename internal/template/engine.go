@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -42,9 +43,7 @@ func NewEngine(themePath, userLayoutPath string) (*Engine, error) {
 			return nil, fmt.Errorf("loading user templates from %s: %w", userLayoutPath, err)
 		}
 		// User files override theme files with the same name.
-		for name, path := range userFiles {
-			files[name] = path
-		}
+		maps.Copy(files, userFiles)
 	}
 
 	// Parse all collected template files.

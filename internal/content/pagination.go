@@ -41,12 +41,9 @@ func Paginate(pages []*Page, pageSize int, baseURL string) []*Pager {
 
 	pagers := make([]*Pager, 0, totalPages)
 
-	for i := 0; i < totalPages; i++ {
+	for i := range totalPages {
 		start := i * pageSize
-		end := start + pageSize
-		if end > len(pages) {
-			end = len(pages)
-		}
+		end := min(start+pageSize, len(pages))
 
 		pageNum := i + 1
 

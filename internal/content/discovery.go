@@ -138,10 +138,7 @@ func Discover(contentDir string, cfg *config.SiteConfig) ([]*Page, error) {
 		// Calculate word count and reading time.
 		page.WordCount = countWords(page.RawContent)
 		if page.WordCount > 0 {
-			page.ReadingTime = page.WordCount / 200
-			if page.ReadingTime < 1 {
-				page.ReadingTime = 1
-			}
+			page.ReadingTime = max(page.WordCount/200, 1)
 		}
 
 		pages = append(pages, page)

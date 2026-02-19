@@ -178,7 +178,7 @@ func where(items any, key string, value any) any {
 	for i := 0; i < v.Len(); i++ {
 		item := v.Index(i)
 		field := item
-		if field.Kind() == reflect.Ptr {
+		if field.Kind() == reflect.Pointer {
 			field = field.Elem()
 		}
 		if field.Kind() == reflect.Struct {
@@ -248,7 +248,7 @@ func groupBy(items any, key string) map[string]any {
 	for i := 0; i < v.Len(); i++ {
 		item := v.Index(i)
 		field := item
-		if field.Kind() == reflect.Ptr {
+		if field.Kind() == reflect.Pointer {
 			field = field.Elem()
 		}
 		if field.Kind() != reflect.Struct {
