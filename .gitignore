@@ -1,1 +1,35 @@
+# Build output
+/public/
+/forge
+/dist/
+
+# Go binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go test binary
+*.test
+
+# Go coverage
+*.out
+coverage.html
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Forge cache
+~/.forge/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Worktrees
 .worktrees/

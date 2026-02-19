@@ -1,0 +1,35 @@
+{{ define "main" }}
+<section class="mx-auto max-w-4xl px-4 py-16">
+  <div class="mb-16 text-center">
+    {{ if .Site.Author.Avatar }}
+    <img src="{{ .Site.Author.Avatar }}" alt="{{ .Site.Author.Name }}" class="mx-auto mb-6 h-24 w-24 rounded-full">
+    {{ end }}
+    <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">{{ .Site.Author.Name }}</h1>
+    {{ if .Site.Author.Bio }}
+    <p class="mt-4 text-lg text-muted-foreground">{{ .Site.Author.Bio }}</p>
+    {{ end }}
+  </div>
+
+  {{ if .Site.Sections.projects }}
+  <div class="mb-16">
+    <h2 class="text-2xl font-bold mb-6">Featured Projects</h2>
+    <div class="grid gap-6 sm:grid-cols-2">
+      {{ range first 4 .Site.Sections.projects }}
+      {{ partial "project-card.html" . }}
+      {{ end }}
+    </div>
+  </div>
+  {{ end }}
+
+  {{ if .Site.Sections.blog }}
+  <div>
+    <h2 class="text-2xl font-bold mb-6">Recent Posts</h2>
+    <div class="space-y-6">
+      {{ range first 5 .Site.Sections.blog }}
+      {{ partial "post-card.html" . }}
+      {{ end }}
+    </div>
+  </div>
+  {{ end }}
+</section>
+{{ end }}
