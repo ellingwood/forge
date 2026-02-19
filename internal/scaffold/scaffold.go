@@ -153,6 +153,344 @@ Write your post content here.
 	return nil
 }
 
+// NewSiteSeeded creates a new site (like NewSite) and then pre-populates it
+// with a kitchen-sink set of sample content so the full theme can be exercised
+// immediately after running `forge serve`.
+func NewSiteSeeded(name string, themeFS fs.FS) error {
+	if err := NewSite(name, themeFS); err != nil {
+		return err
+	}
+
+	now := nowFunc()
+
+	type seedFile struct {
+		path    string
+		content string
+	}
+
+	files := []seedFile{
+		// Homepage
+		{
+			path: filepath.Join(name, "content", "_index.md"),
+			content: `---
+title: "Welcome"
+description: "A sample Forge site demonstrating all theme features."
+---
+
+Welcome to your new Forge site! This homepage was generated with **--seed** to give you a
+full demo of the theme out of the box.
+
+Browse the blog, check out the projects, or read the about page to get started.
+`,
+		},
+		// Blog section listing
+		{
+			path: filepath.Join(name, "content", "blog", "_index.md"),
+			content: `---
+title: "Blog"
+description: "Thoughts, tutorials, and notes."
+---
+`,
+		},
+		// About page (override the stub written by NewSite)
+		{
+			path: filepath.Join(name, "content", "pages", "about.md"),
+			content: fmt.Sprintf(`---
+title: "About"
+date: %s
+layout: "page"
+description: "Learn more about this site and its author."
+---
+
+## Hello!
+
+This is the about page, pre-populated by `+"`forge new site --seed`"+`.
+
+I build things for the web. This site is generated with
+[Forge](https://github.com/aellingwood/forge), a fast static site generator
+written in Go.
+
+Feel free to replace this content with your own story.
+`, now.Format(time.RFC3339)),
+		},
+		// Blog posts
+		{
+			path: filepath.Join(name, "content", "blog", "2025-01-15-getting-started-with-go.md"),
+			content: `---
+title: "Getting Started with Go"
+date: 2025-01-15T09:00:00Z
+tags: ["go", "tutorial"]
+categories: ["programming"]
+description: "A beginner-friendly introduction to the Go programming language."
+---
+
+Go is a statically typed, compiled language designed at Google. It combines the
+performance of C with the readability of Python, making it an excellent choice for
+web services, CLI tools, and systems programming.
+
+## Why Go?
+
+Go's simplicity is its greatest strength. The language has a small specification,
+a fast compiler, and a rich standard library. The built-in concurrency primitives
+(goroutines and channels) make writing concurrent programs straightforward.
+
+## Your First Program
+
+` + "```go" + `
+package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello, world!")
+}
+` + "```" + `
+
+Save this to `+"`main.go`"+` and run `+"`go run main.go`"+`. You should see:
+
+` + "```" + `
+Hello, world!
+` + "```" + `
+
+## Next Steps
+
+- Read the [official tour](https://go.dev/tour/)
+- Explore the [standard library](https://pkg.go.dev/std)
+- Build something small: a CLI tool, a web API, or a file processor
+`,
+		},
+		{
+			path: filepath.Join(name, "content", "blog", "2025-02-10-building-static-sites.md"),
+			content: `---
+title: "Building Static Sites with Forge"
+date: 2025-02-10T10:00:00Z
+tags: ["go", "web"]
+categories: ["tools"]
+description: "How Forge turns Markdown files into a fast static website."
+---
+
+Static sites have made a comeback. They're fast, cheap to host, and easy to reason
+about. Forge is a static site generator written in Go that aims to be simple,
+fast, and opinionated.
+
+## How It Works
+
+Forge reads Markdown files from your `+"`content/`"+` directory, renders them with
+your chosen theme, and writes the output to `+"`public/`"+`. The result is a
+directory of plain HTML files you can serve from any CDN or object storage bucket.
+
+## Key Features
+
+- **Fast builds** — Forge renders pages in parallel using all available CPU cores
+- **Live reload** — `+"`forge serve`"+` watches for changes and reloads the browser
+- **Taxonomies** — Tags and categories generate listing pages automatically
+- **RSS & Atom feeds** — Generated automatically from your blog section
+- **Search index** — A JSON search index is generated for client-side search
+
+## Getting Started
+
+` + "```sh" + `
+forge new site mysite
+cd mysite
+forge serve
+` + "```" + `
+
+Open [http://localhost:1313](http://localhost:1313) and start writing.
+`,
+		},
+		{
+			path: filepath.Join(name, "content", "blog", "2025-03-05-deploying-to-the-cloud.md"),
+			content: `---
+title: "Deploying to the Cloud"
+date: 2025-03-05T08:00:00Z
+tags: ["devops", "tutorial"]
+categories: ["infrastructure"]
+description: "Ship your static site to S3, Cloudflare Pages, or any CDN."
+---
+
+Once you've built your site with `+"`forge build`"+`, deploying is just copying files.
+Here are three common options.
+
+## Amazon S3 + CloudFront
+
+1. Create an S3 bucket with static website hosting enabled
+2. Upload `+"`public/`"+` with `+"`aws s3 sync public/ s3://your-bucket`"+`
+3. Create a CloudFront distribution pointing at your bucket
+4. Set a custom domain via Route 53
+
+## Cloudflare Pages
+
+Cloudflare Pages has a free tier and deploys directly from Git. Point it at your
+repository, set the build command to `+"`forge build`"+` and the output directory to
+`+"`public`"+`, and every push deploys automatically.
+
+## Netlify
+
+Like Cloudflare Pages, Netlify supports Git-based deployments. Add a
+`+"`netlify.toml`"+`:
+
+` + "```toml" + `
+[build]
+  command = "forge build"
+  publish = "public"
+` + "```" + `
+
+## Tips
+
+- Always set `+"`baseURL`"+` in `+"`forge.yaml`"+` to your production domain before building
+- Use `+"`forge build --minify`"+` to shrink HTML output
+`,
+		},
+		{
+			path: filepath.Join(name, "content", "blog", "2025-04-20-markdown-tips.md"),
+			content: `---
+title: "Markdown Tips for Technical Writers"
+date: 2025-04-20T11:00:00Z
+tags: ["web", "tutorial"]
+categories: ["writing"]
+description: "Make the most of Markdown when writing technical documentation."
+---
+
+Markdown is the lingua franca of technical writing. These tips will help you
+produce cleaner, more readable documents.
+
+## Use Headings Consistently
+
+Start with `+"`##`"+` (H2) for top-level sections — reserve `+"`#`"+` (H1) for the document
+title, which is usually injected by the template.
+
+## Code Blocks
+
+Always specify the language for syntax highlighting:
+
+` + "```python" + `
+def greet(name: str) -> str:
+    return f"Hello, {name}!"
+` + "```" + `
+
+## Tables
+
+| Feature       | Supported |
+|---------------|-----------|
+| Tables        | Yes       |
+| Footnotes     | Yes       |
+| Task lists    | Yes       |
+
+## Linking
+
+Prefer reference-style links for long URLs to keep prose readable:
+
+` + "```" + `
+Read the [Go specification][gospec].
+
+[gospec]: https://go.dev/ref/spec
+` + "```" + `
+`,
+		},
+		{
+			path: filepath.Join(name, "content", "blog", "2025-05-30-year-in-review.md"),
+			content: `---
+title: "Year in Review"
+date: 2025-05-30T09:00:00Z
+tags: ["devops"]
+categories: ["personal"]
+description: "Looking back at a year of building, shipping, and learning."
+---
+
+This year was defined by shipping. Five side projects, three blog posts a month,
+and more than I can count in pull requests.
+
+## What Worked
+
+- **Writing in public** — Sharing work-in-progress attracted collaborators I would
+  never have met otherwise.
+- **Short feedback loops** — Daily deploys to production kept the codebase honest
+  and bugs shallow.
+- **Single-purpose tools** — Reaching for the simplest tool that could do the job
+  led to less complexity and fewer late-night incidents.
+
+## What Didn't
+
+- **Premature optimization** — More than once I spent a week squeezing performance
+  out of a system that wasn't the bottleneck.
+- **Neglecting documentation** — Code that isn't documented is code waiting to
+  surprise you six months later.
+
+## Goals for Next Year
+
+1. Publish an open-source library that other people actually use
+2. Write a proper design document before starting any project > 1 week
+3. Take at least one week completely off the computer
+`,
+		},
+		// Projects
+		{
+			path: filepath.Join(name, "content", "projects", "forge.md"),
+			content: `---
+title: "Forge"
+date: 2025-01-01T00:00:00Z
+description: "A fast, opinionated static site generator written in Go."
+params:
+  tech: ["Go", "HTML", "Tailwind CSS"]
+  github: "https://github.com/aellingwood/forge"
+  demo: "https://example.com"
+---
+
+Forge is a static site generator that turns Markdown files into a complete website.
+It renders pages in parallel, supports live reload during development, and generates
+RSS/Atom feeds, a sitemap, and a search index automatically.
+
+The theme system lets you customise every template while keeping the default design
+as a starting point.
+`,
+		},
+		{
+			path: filepath.Join(name, "content", "projects", "go-cli-toolkit.md"),
+			content: `---
+title: "Go CLI Toolkit"
+date: 2025-03-15T00:00:00Z
+description: "A collection of utilities for building polished command-line tools in Go."
+params:
+  tech: ["Go"]
+  github: "https://github.com/example/go-cli-toolkit"
+  demo: ""
+---
+
+A set of small, composable packages for building CLI tools:
+
+- **progress** — animated spinners and progress bars
+- **table** — pretty-print tabular data with column alignment
+- **prompt** — interactive prompts with validation
+- **color** — ANSI colour helpers with automatic NO_COLOR detection
+
+Each package has zero dependencies outside the standard library.
+`,
+		},
+		// Skills data file
+		{
+			path: filepath.Join(name, "data", "skills.yaml"),
+			content: `- category: "Languages"
+  items: ["Go", "TypeScript", "Python", "SQL"]
+- category: "Infrastructure"
+  items: ["AWS", "Cloudflare", "Docker", "Terraform"]
+- category: "Tools"
+  items: ["Git", "Vim", "Postgres", "Redis"]
+`,
+		},
+	}
+
+	for _, f := range files {
+		if err := os.MkdirAll(filepath.Dir(f.path), 0o755); err != nil {
+			return fmt.Errorf("creating directory for %s: %w", f.path, err)
+		}
+		if err := os.WriteFile(f.path, []byte(f.content), 0o644); err != nil {
+			return fmt.Errorf("writing %s: %w", f.path, err)
+		}
+	}
+
+	return nil
+}
+
 // extractFS copies all files from srcDir within src into dstDir on disk.
 func extractFS(src fs.FS, srcDir, dstDir string) error {
 	return fs.WalkDir(src, srcDir, func(path string, d fs.DirEntry, err error) error {

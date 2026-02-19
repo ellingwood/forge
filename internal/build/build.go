@@ -43,6 +43,7 @@ type BuildResult struct {
 	StaticFiles    int
 	Duration       time.Duration
 	OutputSize     int64
+	Pages          []string // URL paths of all rendered pages
 }
 
 // Builder coordinates the full static site generation pipeline.
@@ -135,6 +136,15 @@ func (b *Builder) Build() (*BuildResult, error) {
 	}
 	if !b.options.IncludeExpired {
 		pages = content.FilterExpired(pages)
+	}
+
+	// Inject a virtual home page if none was discovered (i.e., no content/_index.md).
+	// This ensures public/index.html is always generated.
+	if !hasHomePage(pages) {
+		pages = append(pages, &content.Page{
+			Type: content.PageTypeHome,
+			URL:  "/",
+		})
 	}
 
 	// Step 4: Render markdown in parallel.
@@ -252,8 +262,26 @@ func (b *Builder) Build() (*BuildResult, error) {
 			return nil, fmt.Errorf("writing %s: %w", r.url, err)
 		}
 		result.FilesWritten++
+		result.Pages = append(result.Pages, r.url)
 	}
 	result.PagesRendered = len(results)
+
+	// Step 10b: Generate 404.html using theme template if available.
+	notFoundTemplate := engine.Resolve("404", "", "")
+	if notFoundTemplate != "" {
+		notFoundCtx := &tmpl.PageContext{
+			Title: "Page Not Found",
+			Site:  siteCtx,
+		}
+		rendered404, err := engine.Execute(notFoundTemplate, notFoundCtx)
+		if err != nil {
+			return nil, fmt.Errorf("rendering 404 page: %w", err)
+		}
+		if err := WriteFile(outputDir, "/404.html", rendered404); err != nil {
+			return nil, fmt.Errorf("writing 404.html: %w", err)
+		}
+		result.FilesWritten++
+	}
 
 	// Step 11: Copy static files from theme and site static directories.
 	themeStaticDir := filepath.Join(themePath, "static")
@@ -596,6 +624,16 @@ func (b *Builder) buildPageContexts(pages []*content.Page, siteCtx *tmpl.SiteCon
 		}
 	}
 	return m
+}
+
+// hasHomePage reports whether any page in the slice has PageTypeHome.
+func hasHomePage(pages []*content.Page) bool {
+	for _, p := range pages {
+		if p.Type == content.PageTypeHome {
+			return true
+		}
+	}
+	return false
 }
 
 // pageToContext converts a content.Page to a template.PageContext.

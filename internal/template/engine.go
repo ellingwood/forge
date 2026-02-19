@@ -184,6 +184,9 @@ func (e *Engine) Resolve(pageType, section, layout string) string {
 			"_default/terms.html",
 			"_default/list.html",
 		)
+
+	case "404":
+		candidates = append(candidates, "404.html", "_default/404.html")
 	}
 
 	for _, name := range candidates {
