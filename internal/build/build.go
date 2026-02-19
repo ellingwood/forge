@@ -690,8 +690,12 @@ func pageToContext(p *content.Page, siteCtx *tmpl.SiteContext) *tmpl.PageContext
 	}
 
 	if p.Cover != nil {
+		image := p.Cover.Image
+		if image != "" && !strings.HasPrefix(image, "/") && !strings.HasPrefix(image, "http") {
+			image = strings.TrimSuffix(p.URL, "/") + "/" + image
+		}
 		ctx.Cover = &tmpl.CoverImage{
-			Image:   p.Cover.Image,
+			Image:   image,
 			Alt:     p.Cover.Alt,
 			Caption: p.Cover.Caption,
 		}

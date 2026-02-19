@@ -105,7 +105,7 @@ Files in `static/` are copied verbatim into `public/` at the same relative path.
 Use this for site-wide assets (favicon, logo, Open Graph image) that are not tied
 to a specific page.
 
-```
+```tree
 my-site/
 └── static/
     ├── favicon.ico          → public/favicon.ico
@@ -125,7 +125,7 @@ A page bundle is a directory whose name matches the post slug and that contains
 an `index.md` alongside any assets for that page. Forge copies all non-Markdown
 files in the bundle directory next to the rendered `index.html`.
 
-```
+```tree
 content/blog/
 └── my-post/
     ├── index.md             # page content + frontmatter

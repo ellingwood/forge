@@ -6,6 +6,7 @@ package render
 import (
 	"fmt"
 	"html/template"
+	"strings"
 	"time"
 
 	"github.com/aellingwood/forge/internal/config"
@@ -67,8 +68,12 @@ func (r *Renderer) buildPageContext(page *content.Page, allPages []*content.Page
 
 	// Convert cover image if present.
 	if page.Cover != nil {
+		image := page.Cover.Image
+		if image != "" && !strings.HasPrefix(image, "/") && !strings.HasPrefix(image, "http") {
+			image = strings.TrimSuffix(page.URL, "/") + "/" + image
+		}
 		ctx.Cover = &tmpl.CoverImage{
-			Image:   page.Cover.Image,
+			Image:   image,
 			Alt:     page.Cover.Alt,
 			Caption: page.Cover.Caption,
 		}
