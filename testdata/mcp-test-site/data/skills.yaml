@@ -1,0 +1,15 @@
+languages:
+  - name: Go
+    level: Expert
+  - name: TypeScript
+    level: Proficient
+  - name: Python
+    level: Proficient
+
+infrastructure:
+  - name: Kubernetes
+    level: Expert
+  - name: Terraform
+    level: Proficient
+  - name: AWS
+    level: Proficient

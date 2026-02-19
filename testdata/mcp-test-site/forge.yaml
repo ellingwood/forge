@@ -1,0 +1,27 @@
+baseURL: "http://localhost:1313"
+title: "MCP Test Site"
+description: "A test site for MCP server integration tests"
+language: "en"
+theme: "default"
+
+author:
+  name: "Test Author"
+  email: "test@example.com"
+
+taxonomies:
+  tag: tags
+  category: categories
+
+pagination:
+  pageSize: 10
+
+search:
+  enabled: true
+
+feeds:
+  rss: true
+  atom: true
+
+build:
+  minify: false
+  cleanUrls: true
