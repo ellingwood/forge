@@ -20,13 +20,13 @@
 **From source (requires Go 1.26+):**
 
 ```bash
-go install github.com/aellingwood/forge/cmd/forge@latest
+go install github.com/ellingwood/forge/cmd/forge@latest
 ```
 
 **Or build and install locally:**
 
 ```bash
-git clone https://github.com/aellingwood/forge
+git clone https://github.com/ellingwood/forge
 cd forge
 make install   # builds and copies binary to ~/.local/bin/forge
 ```
