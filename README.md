@@ -6,7 +6,7 @@
 
 - **Fast builds** — parallel content processing targets sub-second builds for sites under 500 pages
 - **Single binary** — one compiled Go binary, no runtime dependencies
-- **Live reload** — dev server with WebSocket-based live reload on file save
+- **Live reload** — dev server with WebSocket-based live reload on file save (theme directory changes require a server restart)
 - **Tailwind CSS** — standalone CLI integration, no Node.js required
 - **Syntax highlighting** — 200+ languages via chroma
 - **RSS + Atom feeds** — global and per-section feed generation
@@ -126,10 +126,12 @@ deploy:
     bucket: my-site-bucket
     region: us-east-1
   cloudfront:
-    distribution_id: EXXXXXXXXXXXXX
+    distributionId: EXXXXXXXXXXXXX
 ```
 
 Forge uses the standard AWS credential chain (environment variables → `~/.aws/credentials` → IAM role). No credentials are stored in `forge.yaml`.
+
+**Note:** Deployment is work in progress. The `forge deploy` command is not yet wired up.
 
 ```bash
 forge build && forge deploy
