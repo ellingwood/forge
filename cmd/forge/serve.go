@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sort"
+	"strings"
 	"syscall"
 	"time"
 
@@ -59,11 +61,10 @@ var serveCmd = &cobra.Command{
 			return fmt.Errorf("initial build failed: %w", err)
 		}
 		fmt.Fprintf(cmd.OutOrStdout(),
-			"Build complete: %d pages rendered, %d files written, %d files copied in %s\n",
+			"Build complete: %d pages in %s\n\n%s\n",
 			result.PagesRendered,
-			result.FilesWritten,
-			result.FilesCopied,
 			result.Duration.Round(time.Millisecond),
+			renderTree(result.Pages),
 		)
 
 		// 4. Create the server.
@@ -96,12 +97,11 @@ var serveCmd = &cobra.Command{
 				log.Printf("Rebuild failed: %v", err)
 				return
 			}
-			if verbose {
-				log.Printf("Rebuild complete: %d pages in %s",
-					rebuildResult.PagesRendered,
-					rebuildResult.Duration.Round(time.Millisecond),
-				)
-			}
+			log.Printf("Rebuild complete: %d pages in %s\n\n%s",
+				rebuildResult.PagesRendered,
+				rebuildResult.Duration.Round(time.Millisecond),
+				renderTree(rebuildResult.Pages),
+			)
 			srv.NotifyReload()
 		})
 		srv.SetWatcher(watcher)
@@ -118,6 +118,9 @@ var serveCmd = &cobra.Command{
 			cancel()
 		}()
 
+		addr := fmt.Sprintf("http://%s:%d", bind, port)
+		fmt.Fprintf(cmd.OutOrStdout(), "Serving at %s\n", addr)
+
 		// 7. Start the server (blocks until shutdown).
 		if err := srv.Start(ctx); err != nil {
 			return fmt.Errorf("server error: %w", err)
@@ -125,6 +128,77 @@ var serveCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+// treeNode is a node in an ordered URL tree.
+type treeNode struct {
+	children     map[string]*treeNode
+	childOrder   []string
+}
+
+// renderTree produces a pretty-printed tree of URL paths.
+// The root "/" is always the tree root; sub-paths branch from it.
+func renderTree(pages []string) string {
+	sorted := make([]string, len(pages))
+	copy(sorted, pages)
+	sort.Strings(sorted)
+
+	root := &treeNode{children: make(map[string]*treeNode)}
+
+	for _, url := range sorted {
+		// Strip leading slash and split into segments.
+		trimmed := strings.TrimPrefix(url, "/")
+		if trimmed == "" {
+			continue // root itself; always shown as "/"
+		}
+		// Remove trailing index.html if present (for directory URLs).
+		trimmed = strings.TrimSuffix(trimmed, "index.html")
+		trimmed = strings.TrimSuffix(trimmed, "/")
+		if trimmed == "" {
+			continue
+		}
+		segments := strings.Split(trimmed, "/")
+
+		cur := root
+		for _, seg := range segments {
+			if _, exists := cur.children[seg]; !exists {
+				cur.children[seg] = &treeNode{children: make(map[string]*treeNode)}
+				cur.childOrder = append(cur.childOrder, seg)
+			}
+			cur = cur.children[seg]
+		}
+	}
+
+	var sb strings.Builder
+	sb.WriteString("/\n")
+	writeTreeNodes(&sb, root, "")
+	return strings.TrimRight(sb.String(), "\n")
+}
+
+func writeTreeNodes(sb *strings.Builder, node *treeNode, prefix string) {
+	for i, name := range node.childOrder {
+		child := node.children[name]
+		isLast := i == len(node.childOrder)-1
+
+		connector := "├── "
+		childPrefix := prefix + "│   "
+		if isLast {
+			connector = "└── "
+			childPrefix = prefix + "    "
+		}
+
+		label := name
+		if len(child.children) > 0 || isDirectoryURL(name) {
+			label = name + "/"
+		}
+		sb.WriteString(prefix + connector + label + "\n")
+		writeTreeNodes(sb, child, childPrefix)
+	}
+}
+
+// isDirectoryURL returns true if the segment looks like a directory (no extension).
+func isDirectoryURL(seg string) bool {
+	return !strings.Contains(seg, ".")
 }
 
 func init() {

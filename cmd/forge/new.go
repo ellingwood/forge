@@ -20,7 +20,14 @@ var newSiteCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
-		if err := scaffold.NewSite(name, embedded.DefaultTheme); err != nil {
+		seed, _ := cmd.Flags().GetBool("seed")
+		var err error
+		if seed {
+			err = scaffold.NewSiteSeeded(name, embedded.DefaultTheme)
+		} else {
+			err = scaffold.NewSite(name, embedded.DefaultTheme)
+		}
+		if err != nil {
 			return err
 		}
 		fmt.Fprintf(cmd.OutOrStdout(), "Site created: %s/\n", name)
@@ -71,6 +78,8 @@ var newProjectCmd = &cobra.Command{
 }
 
 func init() {
+	newSiteCmd.Flags().Bool("seed", false, "pre-populate with sample content")
+
 	newCmd.AddCommand(newSiteCmd)
 	newCmd.AddCommand(newPostCmd)
 	newCmd.AddCommand(newPageCmd)
