@@ -67,6 +67,38 @@ var serveCmd = &cobra.Command{
 			renderTree(result.Pages),
 		)
 
+		// 3b. Start Tailwind CSS watch mode (if globals.css exists).
+		themeName := cfg.Theme
+		if themeName == "" {
+			themeName = "default"
+		}
+		themePath := filepath.Join(projectRoot, "themes", themeName)
+		cssInput := filepath.Join(themePath, "static", "css", "globals.css")
+		var tailwindCancel func()
+		if _, err := os.Stat(cssInput); err == nil {
+			cssOutput := filepath.Join(outputDir, "css", "style.css")
+			contentPaths := []string{
+				filepath.Join(themePath, "layouts", "**", "*.html"),
+				filepath.Join(projectRoot, "layouts", "**", "*.html"),
+				filepath.Join(projectRoot, "content", "**", "*.md"),
+			}
+			tb := &build.TailwindBuilder{}
+			twConfig := filepath.Join(themePath, "tailwind.config.js")
+			if _, err := os.Stat(twConfig); err == nil {
+				tb.ConfigPath = twConfig
+			}
+			if _, binErr := tb.EnsureBinary(build.TailwindVersion); binErr != nil {
+				log.Printf("warning: could not download Tailwind CSS binary: %v (skipping CSS watch mode)", binErr)
+			} else {
+				cancelFn, watchErr := tb.Watch(cssInput, cssOutput, contentPaths)
+				if watchErr != nil {
+					log.Printf("warning: could not start Tailwind CSS watcher: %v", watchErr)
+				} else {
+					tailwindCancel = cancelFn
+				}
+			}
+		}
+
 		// 4. Create the server.
 		serveOpts := server.ServeOptions{
 			Port:          port,
@@ -115,6 +147,9 @@ var serveCmd = &cobra.Command{
 		go func() {
 			<-sigCh
 			fmt.Println("\nShutting down...")
+			if tailwindCancel != nil {
+				tailwindCancel()
+			}
 			cancel()
 		}()
 
