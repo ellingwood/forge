@@ -9,12 +9,17 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/aellingwood/forge/internal/config"
 	"github.com/aellingwood/forge/internal/content"
+	"github.com/aellingwood/forge/internal/feed"
+	"github.com/aellingwood/forge/internal/search"
+	"github.com/aellingwood/forge/internal/seo"
 	tmpl "github.com/aellingwood/forge/internal/template"
 )
 
@@ -32,18 +37,12 @@ type BuildOptions struct {
 
 // BuildResult contains statistics about the completed build.
 type BuildResult struct {
-	PagesRendered int
-	FilesWritten  int
-	FilesCopied   int
-	Duration      time.Duration
-	OutputSize    int64
-}
-
-// renderer is the interface used for rendering pages to HTML.
-// This decouples the build package from the render package so that
-// the build pipeline can be tested independently.
-type renderer interface {
-	RenderPage(page *content.Page, allPages []*content.Page) ([]byte, error)
+	PagesRendered  int
+	FilesWritten   int
+	FilesCopied    int
+	StaticFiles    int
+	Duration       time.Duration
+	OutputSize     int64
 }
 
 // Builder coordinates the full static site generation pipeline.
@@ -120,6 +119,13 @@ func (b *Builder) Build() (*BuildResult, error) {
 		p.Permalink = strings.TrimRight(baseURL, "/") + p.URL
 	}
 
+	// Load data files from data/ directory.
+	dataDir := filepath.Join(projectRoot, "data")
+	dataFiles, err := content.LoadDataFiles(dataDir)
+	if err != nil {
+		return nil, fmt.Errorf("loading data files: %w", err)
+	}
+
 	// Step 3: Filter pages based on options.
 	if !b.options.IncludeDrafts {
 		pages = content.FilterDrafts(pages)
@@ -148,8 +154,32 @@ func (b *Builder) Build() (*BuildResult, error) {
 		return nil, fmt.Errorf("rendering markdown: %w", err)
 	}
 
+	// Step 4b: Generate summaries, word counts, and reading times.
+	for _, p := range pages {
+		// Calculate word count and reading time from plain text content.
+		plainText := content.StripHTMLTags(p.Content)
+		p.WordCount = content.CalculateWordCount(plainText)
+		p.ReadingTime = content.CalculateReadingTime(plainText)
+
+		// Generate summary if not already set from frontmatter.
+		if p.Summary == "" {
+			p.Summary = content.GenerateSummary(p.RawContent, p.Content, 300)
+		}
+	}
+
 	// Step 5: Build taxonomy maps.
 	tags, categories := buildTaxonomyMaps(pages)
+
+	// Step 5b: Generate taxonomy virtual pages.
+	if b.config.Taxonomies != nil {
+		taxonomies := content.BuildTaxonomies(pages, b.config.Taxonomies)
+		taxPages := content.GenerateTaxonomyPages(taxonomies)
+		// Set permalinks on taxonomy pages.
+		for _, tp := range taxPages {
+			tp.Permalink = strings.TrimRight(baseURL, "/") + tp.URL
+		}
+		pages = append(pages, taxPages...)
+	}
 
 	// Step 6: Sort pages by date (newest first) and set prev/next links.
 	content.SortByDate(pages, false)
@@ -169,7 +199,7 @@ func (b *Builder) Build() (*BuildResult, error) {
 	}
 
 	// Build site context for templates.
-	siteCtx := b.buildSiteContext(pages, tags, categories, baseURL)
+	siteCtx := b.buildSiteContext(pages, tags, categories, baseURL, dataFiles)
 
 	// Build page contexts for all pages.
 	pageContextMap := b.buildPageContexts(pages, siteCtx)
@@ -262,6 +292,160 @@ func (b *Builder) Build() (*BuildResult, error) {
 		}
 	}
 
+	// Step 13: Generate ancillary files (sitemap, robots, feeds, search index, aliases).
+
+	// Collect non-draft pages for sitemap and search.
+	var nonDraftPages []*content.Page
+	for _, p := range pages {
+		if !p.Draft {
+			nonDraftPages = append(nonDraftPages, p)
+		}
+	}
+
+	// Generate sitemap.xml.
+	sitemapEntries := make([]seo.SitemapEntry, 0, len(nonDraftPages))
+	for _, p := range nonDraftPages {
+		sitemapEntries = append(sitemapEntries, seo.SitemapEntry{
+			URL:     p.Permalink,
+			Lastmod: p.Lastmod,
+		})
+	}
+	sitemapData, err := seo.GenerateSitemap(sitemapEntries)
+	if err != nil {
+		return nil, fmt.Errorf("generating sitemap: %w", err)
+	}
+	if err := writeDirectFile(outputDir, "sitemap.xml", sitemapData); err != nil {
+		return nil, fmt.Errorf("writing sitemap.xml: %w", err)
+	}
+	result.StaticFiles++
+
+	// Generate robots.txt.
+	sitemapURL := strings.TrimRight(baseURL, "/") + "/sitemap.xml"
+	robotsData := seo.GenerateRobotsTxt(sitemapURL)
+	if err := writeDirectFile(outputDir, "robots.txt", robotsData); err != nil {
+		return nil, fmt.Errorf("writing robots.txt: %w", err)
+	}
+	result.StaticFiles++
+
+	// Collect blog posts for feeds (non-draft, section == "blog" or configured sections, sorted by date desc).
+	feedSections := b.config.Feeds.Sections
+	if len(feedSections) == 0 {
+		feedSections = []string{"blog"}
+	}
+	var feedPages []*content.Page
+	for _, p := range nonDraftPages {
+		if slices.Contains(feedSections, p.Section) {
+			feedPages = append(feedPages, p)
+		}
+	}
+	sort.SliceStable(feedPages, func(i, j int) bool {
+		return feedPages[i].Date.After(feedPages[j].Date)
+	})
+
+	// Convert pages to FeedItems.
+	feedItems := make([]feed.FeedItem, 0, len(feedPages))
+	for _, p := range feedPages {
+		feedItems = append(feedItems, feed.FeedItem{
+			Title:       p.Title,
+			Link:        p.Permalink,
+			Description: p.Summary,
+			Content:     p.Content,
+			Author:      p.Author,
+			PubDate:     p.Date,
+			GUID:        p.Permalink,
+			Categories:  append(p.Tags, p.Categories...),
+		})
+	}
+
+	feedOpts := feed.FeedOptions{
+		Title:       b.config.Title,
+		Description: b.config.Description,
+		Link:        strings.TrimRight(baseURL, "/"),
+		Language:    b.config.Language,
+		Author:      b.config.Author.Name,
+		MaxItems:    b.config.Feeds.Limit,
+		FullContent: b.config.Feeds.FullContent,
+	}
+
+	// Generate RSS feed (index.xml).
+	if b.config.Feeds.RSS {
+		feedOpts.FeedLink = strings.TrimRight(baseURL, "/") + "/index.xml"
+		rssData, err := feed.GenerateRSS(feedItems, feedOpts)
+		if err != nil {
+			return nil, fmt.Errorf("generating RSS feed: %w", err)
+		}
+		if err := writeDirectFile(outputDir, "index.xml", rssData); err != nil {
+			return nil, fmt.Errorf("writing index.xml: %w", err)
+		}
+		result.StaticFiles++
+	}
+
+	// Generate Atom feed (atom.xml).
+	if b.config.Feeds.Atom {
+		feedOpts.FeedLink = strings.TrimRight(baseURL, "/") + "/atom.xml"
+		atomData, err := feed.GenerateAtom(feedItems, feedOpts)
+		if err != nil {
+			return nil, fmt.Errorf("generating Atom feed: %w", err)
+		}
+		if err := writeDirectFile(outputDir, "atom.xml", atomData); err != nil {
+			return nil, fmt.Errorf("writing atom.xml: %w", err)
+		}
+		result.StaticFiles++
+	}
+
+	// Generate search index (search-index.json).
+	if b.config.Search.Enabled {
+		maxContentLen := b.config.Search.ContentLength
+		if maxContentLen <= 0 {
+			maxContentLen = 5000
+		}
+		indexEntries := make([]search.IndexEntry, 0, len(nonDraftPages))
+		for _, p := range nonDraftPages {
+			strippedContent := search.StripHTML(p.Content)
+			indexEntries = append(indexEntries, search.IndexEntry{
+				Title:      p.Title,
+				URL:        p.URL,
+				Tags:       p.Tags,
+				Categories: p.Categories,
+				Summary:    content.StripHTMLTags(p.Summary),
+				Content:    strippedContent,
+			})
+		}
+		searchData, err := search.GenerateIndex(indexEntries, maxContentLen)
+		if err != nil {
+			return nil, fmt.Errorf("generating search index: %w", err)
+		}
+		if err := writeDirectFile(outputDir, "search-index.json", searchData); err != nil {
+			return nil, fmt.Errorf("writing search-index.json: %w", err)
+		}
+		result.StaticFiles++
+	}
+
+	// Generate alias redirect pages.
+	var aliases []AliasPage
+	for _, p := range pages {
+		for _, alias := range p.Aliases {
+			aliases = append(aliases, AliasPage{
+				AliasURL:     alias,
+				CanonicalURL: p.URL,
+			})
+		}
+	}
+	if len(aliases) > 0 {
+		aliasFiles := GenerateAliasPages(aliases)
+		for filePath, htmlData := range aliasFiles {
+			fullPath := filepath.Join(outputDir, filePath)
+			dir := filepath.Dir(fullPath)
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				return nil, fmt.Errorf("creating alias directory %s: %w", dir, err)
+			}
+			if err := os.WriteFile(fullPath, htmlData, 0o644); err != nil {
+				return nil, fmt.Errorf("writing alias file %s: %w", fullPath, err)
+			}
+			result.StaticFiles++
+		}
+	}
+
 	// Calculate output size.
 	size, err := DirSize(outputDir)
 	if err != nil {
@@ -271,6 +455,16 @@ func (b *Builder) Build() (*BuildResult, error) {
 	result.Duration = time.Since(start)
 
 	return result, nil
+}
+
+// writeDirectFile writes data to a named file directly in the output directory.
+func writeDirectFile(outputDir, filename string, data []byte) error {
+	filePath := filepath.Join(outputDir, filename)
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("creating directory %s: %w", dir, err)
+	}
+	return os.WriteFile(filePath, data, 0o644)
 }
 
 // copyDirCounting copies a directory and returns the number of files copied.
@@ -305,6 +499,7 @@ func (b *Builder) buildSiteContext(
 	tags map[string][]*content.Page,
 	categories map[string][]*content.Page,
 	baseURL string,
+	dataFiles map[string]any,
 ) *tmpl.SiteContext {
 	// Build menu items.
 	menuItems := make([]tmpl.MenuItemContext, len(b.config.Menu.Main))
@@ -370,7 +565,7 @@ func (b *Builder) buildSiteContext(
 		},
 		Menu:       menuItems,
 		Params:     b.config.Params,
-		Data:       make(map[string]any),
+		Data:       dataFiles,
 		Pages:      sitePages,
 		Sections:   sections,
 		Taxonomies: taxonomies,
