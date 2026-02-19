@@ -26,6 +26,8 @@ Use Read/Glob only if qmd doesn’t return enough results.
 forge/
 ├── cmd/forge/          # CLI entry points (cobra commands)
 │   ├── main.go
+│   ├── root.go         # root cobra command, persistent flags (--config, --verbose)
+│   ├── config.go       # forge config – print fully resolved site configuration as YAML
 │   ├── build.go        # forge build
 │   ├── serve.go        # forge serve
 │   ├── new.go          # forge new site/post/page/project
@@ -48,7 +50,7 @@ forge/
 │   └── template/       # Go html/template wrapper + custom functions
 ├── embedded/           # go:embed assets (default theme)
 ├── themes/default/     # Default theme (layouts, static, theme.yaml)
-└── testdata/           # Golden file test fixtures
+└── testdata/           # Integration test fixtures (mcp-test-site/)
 ```
 
 ## Development Commands
@@ -73,7 +75,7 @@ make clean    # remove ./forge and public/
 
 ## Testing Notes
 
-- Golden file tests live in `testdata/`; input Markdown → expected HTML output
+- `testdata/mcp-test-site/` is a full site fixture used for MCP server integration tests
 - Update testdata fixtures manually by editing files in `testdata/`
 - Integration tests build the `testdata/` test site and assert output structure
 - Run a single package: `go test ./internal/content/...`

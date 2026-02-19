@@ -40,6 +40,7 @@ cd my-site
 
 # Start the dev server with live reload
 forge serve
+# Open http://localhost:1313
 
 # Build for production
 forge build
@@ -76,10 +77,7 @@ my-site/
 │   │   └── my-first-post.md
 │   └── projects/
 │       └── my-project.md
-├── themes/
-│   └── default/            # Override default theme here
-│       ├── layouts/
-│       └── static/
+├── layouts/                # Template overrides (override default theme layouts here)
 └── public/                 # Generated output (git-ignored)
 ```
 
