@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 )
 
@@ -58,7 +59,13 @@ func TestNewSite(t *testing.T) {
 	dir := t.TempDir()
 	siteName := filepath.Join(dir, "my-site")
 
-	if err := NewSite(siteName); err != nil {
+	themeFS := fstest.MapFS{
+		"themes/default/layouts/index.html":           {Data: []byte("<html>index</html>")},
+		"themes/default/layouts/_default/single.html": {Data: []byte("<html>single</html>")},
+		"themes/default/layouts/_default/list.html":   {Data: []byte("<html>list</html>")},
+	}
+
+	if err := NewSite(siteName, themeFS); err != nil {
 		t.Fatalf("NewSite(%q): %v", siteName, err)
 	}
 
@@ -83,6 +90,21 @@ func TestNewSite(t *testing.T) {
 		if !info.IsDir() {
 			t.Errorf("expected %q to be a directory", d)
 		}
+	}
+
+	// Verify theme was extracted.
+	themeLayoutDir := filepath.Join(siteName, "themes", "default", "layouts")
+	info, err := os.Stat(themeLayoutDir)
+	if err != nil {
+		t.Errorf("expected themes/default/layouts to exist: %v", err)
+	} else if !info.IsDir() {
+		t.Errorf("expected themes/default/layouts to be a directory")
+	}
+
+	// Verify a theme file was extracted.
+	indexTmpl := filepath.Join(themeLayoutDir, "index.html")
+	if _, err := os.Stat(indexTmpl); err != nil {
+		t.Errorf("expected themes/default/layouts/index.html to exist: %v", err)
 	}
 
 	// Verify forge.yaml exists and contains the site name.
@@ -141,7 +163,7 @@ func TestNewSite_AlreadyExists(t *testing.T) {
 		t.Fatalf("creating test directory: %v", err)
 	}
 
-	err := NewSite(siteName)
+	err := NewSite(siteName, nil)
 	if err == nil {
 		t.Fatal("expected error when directory already exists, got nil")
 	}

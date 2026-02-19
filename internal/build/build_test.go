@@ -7,8 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aellingwood/forge/embedded"
 	"github.com/aellingwood/forge/internal/config"
 	"github.com/aellingwood/forge/internal/content"
+	"github.com/aellingwood/forge/internal/scaffold"
 )
 
 // --- Writer utility tests ---
@@ -871,5 +873,28 @@ func TestBuild_CleanOutput(t *testing.T) {
 	// The stale file should have been removed by CleanDir.
 	if _, err := os.Stat(staleFile); !os.IsNotExist(err) {
 		t.Error("stale file should have been removed during build")
+	}
+}
+
+// TestBuild_NewSite verifies that a freshly scaffolded site (via scaffold.NewSite)
+// can be built without errors. This is a regression test for the bug where
+// themes/default/layouts was not created during site initialization.
+func TestBuild_NewSite(t *testing.T) {
+	dir := t.TempDir()
+	siteName := filepath.Join(dir, "my-new-site")
+
+	if err := scaffold.NewSite(siteName, embedded.DefaultTheme); err != nil {
+		t.Fatalf("scaffold.NewSite: %v", err)
+	}
+
+	cfg, err := config.Load(filepath.Join(siteName, "forge.yaml"))
+	if err != nil {
+		t.Fatalf("config.Load: %v", err)
+	}
+
+	opts := BuildOptions{ProjectRoot: siteName}
+	builder := NewBuilder(cfg, opts)
+	if _, err := builder.Build(); err != nil {
+		t.Fatalf("Build on fresh site failed: %v", err)
 	}
 }

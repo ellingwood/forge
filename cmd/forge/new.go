@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/aellingwood/forge/embedded"
 	"github.com/aellingwood/forge/internal/scaffold"
 	"github.com/spf13/cobra"
 )
@@ -19,7 +20,7 @@ var newSiteCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
-		if err := scaffold.NewSite(name); err != nil {
+		if err := scaffold.NewSite(name, embedded.DefaultTheme); err != nil {
 			return err
 		}
 		fmt.Fprintf(cmd.OutOrStdout(), "Site created: %s/\n", name)

@@ -4,6 +4,7 @@ package scaffold
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -52,7 +53,8 @@ func Slugify(title string) string {
 
 // NewSite creates a new site directory with the standard Forge structure.
 // It returns an error if the directory already exists.
-func NewSite(name string) error {
+// If themeFS is non-nil, theme files are extracted from it into themes/.
+func NewSite(name string, themeFS fs.FS) error {
 	// Check if directory already exists.
 	if _, err := os.Stat(name); err == nil {
 		return fmt.Errorf("directory %q already exists", name)
@@ -140,7 +142,37 @@ Write your post content here.
 		return fmt.Errorf("writing hello-world.md: %w", err)
 	}
 
+	// Extract theme files from embedded FS if provided.
+	if themeFS != nil {
+		themeDst := filepath.Join(name, "themes")
+		if err := extractFS(themeFS, "themes", themeDst); err != nil {
+			return fmt.Errorf("extracting default theme: %w", err)
+		}
+	}
+
 	return nil
+}
+
+// extractFS copies all files from srcDir within src into dstDir on disk.
+func extractFS(src fs.FS, srcDir, dstDir string) error {
+	return fs.WalkDir(src, srcDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(srcDir, path)
+		if err != nil {
+			return err
+		}
+		dst := filepath.Join(dstDir, rel)
+		if d.IsDir() {
+			return os.MkdirAll(dst, 0o755)
+		}
+		data, err := fs.ReadFile(src, path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(dst, data, 0o644)
+	})
 }
 
 // NewPost creates a new blog post file at content/blog/YYYY-MM-DD-slug.md.
