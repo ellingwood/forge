@@ -817,7 +817,7 @@ func TestPageToContext(t *testing.T) {
 		},
 	}
 
-	ctx := pageToContext(page, nil)
+	ctx := pageToContext(page, nil, nil)
 
 	if ctx.Title != "Test Page" {
 		t.Errorf("Title = %q, want %q", ctx.Title, "Test Page")

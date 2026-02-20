@@ -2,7 +2,20 @@
 <article class="mx-auto max-w-3xl px-4 py-12">
   {{ if .Cover }}
   <figure class="mb-8">
-    <img src="{{ .Cover.Image }}" alt="{{ .Cover.Alt }}" class="w-full rounded-lg">
+    {{ if .Cover.WebPSrcset }}
+    <picture>
+      <source type="image/webp" srcset="{{ .Cover.WebPSrcset }}" sizes="{{ .Cover.Sizes }}">
+      <img src="{{ .Cover.Image }}"
+           {{ if .Cover.Srcset }}srcset="{{ .Cover.Srcset }}" sizes="{{ .Cover.Sizes }}"{{ end }}
+           alt="{{ .Cover.Alt }}"
+           width="{{ .Cover.Width }}" height="{{ .Cover.Height }}"
+           loading="eager" decoding="async" class="w-full rounded-lg">
+    </picture>
+    {{ else }}
+    <img src="{{ .Cover.Image }}" alt="{{ .Cover.Alt }}" class="w-full rounded-lg"
+         {{ if .Cover.Width }}width="{{ .Cover.Width }}" height="{{ .Cover.Height }}"{{ end }}
+         loading="eager" decoding="async">
+    {{ end }}
     {{ if .Cover.Caption }}<figcaption class="mt-2 text-center text-sm text-muted-foreground">{{ .Cover.Caption }}</figcaption>{{ end }}
   </figure>
   {{ end }}

@@ -10,7 +10,20 @@
         </div>
       </div>
       {{ if .Cover }}
-      <img src="{{ .Cover.Image }}" alt="{{ .Cover.Alt }}" class="h-20 w-20 rounded-md object-cover">
+        {{ if .Cover.WebPSrcset }}
+        <picture>
+          <source type="image/webp" srcset="{{ .Cover.WebPSrcset }}" sizes="80px">
+          <img src="{{ .Cover.Image }}"
+               {{ if .Cover.Srcset }}srcset="{{ .Cover.Srcset }}" sizes="80px"{{ end }}
+               alt="{{ .Cover.Alt }}"
+               width="{{ .Cover.Width }}" height="{{ .Cover.Height }}"
+               loading="lazy" decoding="async"
+               class="h-20 w-20 rounded-md object-cover">
+        </picture>
+        {{ else }}
+        <img src="{{ .Cover.Image }}" alt="{{ .Cover.Alt }}" class="h-20 w-20 rounded-md object-cover"
+             loading="lazy" decoding="async">
+        {{ end }}
       {{ end }}
     </div>
     {{ if .Tags }}

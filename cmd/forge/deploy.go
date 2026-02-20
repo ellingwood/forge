@@ -12,6 +12,7 @@ import (
 
 	siteconfig "github.com/aellingwood/forge/internal/config"
 	"github.com/aellingwood/forge/internal/deploy"
+	"github.com/aellingwood/forge/internal/security"
 	"github.com/spf13/cobra"
 )
 
@@ -31,14 +32,29 @@ var deployCmd = &cobra.Command{
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 
 		deployCfg := deploy.DeployConfig{
-			Bucket:       cfg.Deploy.S3.Bucket,
-			Region:       cfg.Deploy.S3.Region,
-			Endpoint:     cfg.Deploy.Endpoint,
-			Profile:      cfg.Deploy.Profile,
-			Distribution: cfg.Deploy.CloudFront.DistributionID,
-			URLRewrite:   cfg.Deploy.CloudFront.URLRewrite,
-			DryRun:       dryRun,
-			Verbose:      verbose,
+			Bucket:          cfg.Deploy.S3.Bucket,
+			Region:          cfg.Deploy.S3.Region,
+			Endpoint:        cfg.Deploy.Endpoint,
+			Profile:         cfg.Deploy.Profile,
+			Distribution:    cfg.Deploy.CloudFront.DistributionID,
+			URLRewrite:      cfg.Deploy.CloudFront.URLRewrite,
+			SecurityHeaders: cfg.Deploy.CloudFront.SecurityHeaders,
+			DryRun:          dryRun,
+			Verbose:         verbose,
+		}
+
+		// Build security headers config if enabled.
+		if deployCfg.SecurityHeaders {
+			cspPolicy := security.ProdPolicy(&cfg.Security.CSP)
+			deployCfg.SecurityHeadersCfg = deploy.ResponseHeadersConfig{
+				CSP:                 cspPolicy.String(),
+				HSTSMaxAge:          cfg.Security.HSTS.MaxAge,
+				HSTSSubDomains:      cfg.Security.HSTS.IncludeSubDomains,
+				HSTSPreload:         cfg.Security.HSTS.Preload,
+				XContentTypeNosniff: true,
+				XFrameOptions:       "DENY",
+				ReferrerPolicy:      "strict-origin-when-cross-origin",
+			}
 		}
 
 		if deployCfg.Bucket == "" {
@@ -80,6 +96,7 @@ var deployCmd = &cobra.Command{
 
 		var cfClient deploy.CloudFrontClient
 		var cfFuncClient deploy.CloudFrontFunctionClient
+		var cfHeadersClient deploy.CloudFrontHeadersPolicyClient
 
 		if deployCfg.Distribution != "" {
 			cfOpts := []func(*cloudfront.Options){}
@@ -93,11 +110,14 @@ var deployCmd = &cobra.Command{
 			if deployCfg.URLRewrite {
 				cfFuncClient = deploy.NewAWSCloudFrontFunctionClient(cfSDK)
 			}
+			if deployCfg.SecurityHeaders {
+				cfHeadersClient = deploy.NewAWSCloudFrontHeadersPolicyClient(cfSDK)
+			}
 		}
 
 		// 5. Deploy.
 		fmt.Fprintf(cmd.OutOrStdout(), "Deploying to s3://%s ...\n", deployCfg.Bucket)
-		result, err := deploy.Deploy(ctx, deployCfg, publicDir, s3Client, cfClient, cfFuncClient)
+		result, err := deploy.Deploy(ctx, deployCfg, publicDir, s3Client, cfClient, cfFuncClient, cfHeadersClient)
 		if err != nil {
 			return fmt.Errorf("deploy failed: %w", err)
 		}

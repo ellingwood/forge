@@ -21,8 +21,8 @@ coverage.html
 .DS_Store
 Thumbs.db
 
-# Forge cache
-~/.forge/
+# Forge cache (image processing cache)
+.forge/
 
 # IDE
 .idea/
