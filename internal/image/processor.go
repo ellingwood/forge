@@ -344,7 +344,7 @@ func encodeImage(img image.Image, outPath, format string, quality int) error {
 
 	switch format {
 	case "webp":
-		opts := webp.Options{Quality: quality}
+		opts := webp.Options{Quality: quality, Method: 4}
 		if err := webp.Encode(f, img, opts); err != nil {
 			return fmt.Errorf("encoding webp: %w", err)
 		}

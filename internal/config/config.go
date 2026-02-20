@@ -215,7 +215,7 @@ func Default() *SiteConfig {
 		Build: BuildConfig{},
 		Images: ImageConfig{
 			Enabled: true,
-			Quality: 75,
+			Quality: 70,
 			Sizes:   []int{320, 640, 960, 1280, 1920},
 			Formats: []string{"webp", "original"},
 		},
