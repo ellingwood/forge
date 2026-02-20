@@ -23,15 +23,16 @@ func GenerateNonce() (string, error) {
 
 // CSPPolicy holds the directives for a Content-Security-Policy header.
 type CSPPolicy struct {
-	DefaultSrc []string
-	ScriptSrc  []string
-	StyleSrc   []string
-	ImgSrc     []string
-	FontSrc    []string
-	ConnectSrc []string
-	BaseURI    []string
-	FormAction []string
-	FrameAnc   []string
+	DefaultSrc  []string
+	ScriptSrc   []string
+	StyleSrc    []string
+	ImgSrc      []string
+	FontSrc     []string
+	ConnectSrc  []string
+	ManifestSrc []string
+	BaseURI     []string
+	FormAction  []string
+	FrameAnc    []string
 }
 
 // String serializes the policy to a CSP header value.
@@ -49,6 +50,7 @@ func (p *CSPPolicy) String() string {
 	add("img-src", p.ImgSrc)
 	add("font-src", p.FontSrc)
 	add("connect-src", p.ConnectSrc)
+	add("manifest-src", p.ManifestSrc)
 	add("base-uri", p.BaseURI)
 	add("form-action", p.FormAction)
 	add("frame-ancestors", p.FrameAnc)
@@ -60,15 +62,16 @@ func (p *CSPPolicy) String() string {
 // the given port.
 func DevPolicy(nonce string, port int) *CSPPolicy {
 	return &CSPPolicy{
-		DefaultSrc: []string{"'none'"},
-		ScriptSrc:  []string{"'self'", fmt.Sprintf("'nonce-%s'", nonce)},
-		StyleSrc:   []string{"'self'", "'unsafe-inline'"},
-		ImgSrc:     []string{"'self'", "data:"},
-		FontSrc:    []string{"'self'"},
-		ConnectSrc: []string{"'self'", fmt.Sprintf("ws://localhost:%d", port)},
-		BaseURI:    []string{"'self'"},
-		FormAction: []string{"'self'"},
-		FrameAnc:   []string{"'none'"},
+		DefaultSrc:  []string{"'none'"},
+		ScriptSrc:   []string{"'self'", fmt.Sprintf("'nonce-%s'", nonce)},
+		StyleSrc:    []string{"'self'", "'unsafe-inline'"},
+		ImgSrc:      []string{"'self'", "data:"},
+		FontSrc:     []string{"'self'"},
+		ConnectSrc:  []string{"'self'", fmt.Sprintf("ws://localhost:%d", port)},
+		ManifestSrc: []string{"'self'"},
+		BaseURI:     []string{"'self'"},
+		FormAction:  []string{"'self'"},
+		FrameAnc:    []string{"'none'"},
 	}
 }
 
@@ -76,15 +79,16 @@ func DevPolicy(nonce string, port int) *CSPPolicy {
 // scripts should be externalized. Extra directives from config are appended.
 func ProdPolicy(extra *config.CSPConfig) *CSPPolicy {
 	p := &CSPPolicy{
-		DefaultSrc: []string{"'none'"},
-		ScriptSrc:  []string{"'self'"},
-		StyleSrc:   []string{"'self'", "'unsafe-inline'"},
-		ImgSrc:     []string{"'self'", "data:"},
-		FontSrc:    []string{"'self'"},
-		ConnectSrc: []string{"'self'"},
-		BaseURI:    []string{"'self'"},
-		FormAction: []string{"'self'"},
-		FrameAnc:   []string{"'none'"},
+		DefaultSrc:  []string{"'none'"},
+		ScriptSrc:   []string{"'self'"},
+		StyleSrc:    []string{"'self'", "'unsafe-inline'"},
+		ImgSrc:      []string{"'self'", "data:"},
+		FontSrc:     []string{"'self'"},
+		ConnectSrc:  []string{"'self'"},
+		ManifestSrc: []string{"'self'"},
+		BaseURI:     []string{"'self'"},
+		FormAction:  []string{"'self'"},
+		FrameAnc:    []string{"'none'"},
 	}
 	if extra != nil {
 		p.ScriptSrc = append(p.ScriptSrc, extra.ScriptSrc...)

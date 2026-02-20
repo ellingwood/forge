@@ -119,6 +119,82 @@ func TestInjectScriptNonces_NoScripts(t *testing.T) {
 	}
 }
 
+func TestInjectScriptNonces_SkipsNonJSTypes(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"application/json", `<script type="application/json">{"key":"val"}</script>`},
+		{"application/ld+json", `<script type="application/ld+json">{"@type":"WebPage"}</script>`},
+		{"text/template", `<script type="text/template"><div>{{.}}</div></script>`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := InjectScriptNonces([]byte(tt.input), "abc123")
+			if bytes.Contains(result, []byte("nonce=")) {
+				t.Errorf("should not add nonce to %s script, got: %s", tt.name, result)
+			}
+		})
+	}
+}
+
+func TestInjectScriptNonces_AddsNonceToJSTypes(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"text/javascript", `<script type="text/javascript">code()</script>`},
+		{"module", `<script type="module">import x from './x'</script>`},
+		{"bare script", `<script>code()</script>`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := InjectScriptNonces([]byte(tt.input), "abc123")
+			if !bytes.Contains(result, []byte(`nonce="abc123"`)) {
+				t.Errorf("expected nonce for %s script, got: %s", tt.name, result)
+			}
+		})
+	}
+}
+
+func TestHandleRequest_SecurityHeadersOnlyForHTML(t *testing.T) {
+	outputDir := t.TempDir()
+	writeTestFile(t, outputDir, "style.css", "body { color: red; }")
+	writeTestFile(t, outputDir, "index.html", "<html><body>hi</body></html>")
+
+	srv := NewServer(config.Default(), ServeOptions{
+		Port:         1313,
+		Bind:         "localhost",
+		OutputDir:    outputDir,
+		NoLiveReload: true,
+	})
+
+	// CSS request should NOT have CSP header.
+	req := httptest.NewRequest("GET", "/style.css", nil)
+	rr := httptest.NewRecorder()
+	srv.handleRequest(rr, req)
+
+	if rr.Header().Get("Content-Security-Policy") != "" {
+		t.Error("CSS response should not have Content-Security-Policy header")
+	}
+	if rr.Header().Get("X-Frame-Options") != "" {
+		t.Error("CSS response should not have X-Frame-Options header")
+	}
+	// X-Content-Type-Options should still be set for all responses.
+	if rr.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Error("CSS response should still have X-Content-Type-Options: nosniff")
+	}
+
+	// HTML request SHOULD have CSP header.
+	req2 := httptest.NewRequest("GET", "/", nil)
+	rr2 := httptest.NewRecorder()
+	srv.handleRequest(rr2, req2)
+
+	if rr2.Header().Get("Content-Security-Policy") == "" {
+		t.Error("HTML response should have Content-Security-Policy header")
+	}
+}
+
 func TestInjectScriptNonces_CaseInsensitive(t *testing.T) {
 	html := []byte(`<SCRIPT>code()</SCRIPT>`)
 	result := InjectScriptNonces(html, "nonce1")
