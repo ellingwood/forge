@@ -24,19 +24,24 @@ type MarkdownRenderer struct {
 }
 
 // NewMarkdownRenderer creates a MarkdownRenderer configured with all
-// standard extensions enabled.
-func NewMarkdownRenderer() *MarkdownRenderer {
-	md := goldmark.New(
-		goldmark.WithExtensions(
-			extension.GFM,
-			extension.Footnote,
-			extension.Typographer,
-			highlighting.NewHighlighting(
-				highlighting.WithFormatOptions(
-					chromahtml.WithClasses(true),
-				),
+// standard extensions enabled. Optional additional goldmark extensions
+// (e.g. the responsive image extension) can be appended via the
+// extensions variadic parameter.
+func NewMarkdownRenderer(extensions ...goldmark.Extender) *MarkdownRenderer {
+	exts := []goldmark.Extender{
+		extension.GFM,
+		extension.Footnote,
+		extension.Typographer,
+		highlighting.NewHighlighting(
+			highlighting.WithFormatOptions(
+				chromahtml.WithClasses(true),
 			),
 		),
+	}
+	exts = append(exts, extensions...)
+
+	md := goldmark.New(
+		goldmark.WithExtensions(exts...),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(),
 			parser.WithAttribute(),

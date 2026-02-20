@@ -222,12 +222,12 @@ func (p *Processor) ProcessDir(srcDir, outputDir, urlPrefix string) error {
 		return nil
 	}
 
-	// Bounded worker pool.
+	// Bounded worker pool. Individual image failures are logged but skipped
+	// so the build can continue (e.g. corrupted or zero-byte images in
+	// static directories).
 	numWorkers := runtime.NumCPU()
 	sem := make(chan struct{}, numWorkers)
 	var wg sync.WaitGroup
-	var mu sync.Mutex
-	var firstErr error
 
 	for _, j := range jobs {
 		j := j // capture
@@ -238,16 +238,12 @@ func (p *Processor) ProcessDir(srcDir, outputDir, urlPrefix string) error {
 			defer func() { <-sem }() // release
 
 			if _, err := p.Process(j.srcPath, j.srcURL, j.outDir); err != nil {
-				mu.Lock()
-				if firstErr == nil {
-					firstErr = err
-				}
-				mu.Unlock()
+				fmt.Fprintf(os.Stderr, "warning: skipping image %s: %v\n", j.srcPath, err)
 			}
 		}()
 	}
 	wg.Wait()
-	return firstErr
+	return nil
 }
 
 // GetImage returns the ProcessedImage for the given source URL, or nil if it

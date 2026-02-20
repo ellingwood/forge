@@ -38,9 +38,14 @@ type PageContext struct {
 
 // CoverImage mirrors content.CoverImage for templates.
 type CoverImage struct {
-	Image   string
-	Alt     string
-	Caption string
+	Image      string
+	Alt        string
+	Caption    string
+	Width      int    // original image width (populated when image processing is enabled)
+	Height     int    // original image height
+	Srcset     string // precomputed srcset for original format
+	WebPSrcset string // precomputed srcset for WebP
+	Sizes      string // precomputed sizes attribute
 }
 
 // SiteContext holds site-wide data accessible as .Site in templates.

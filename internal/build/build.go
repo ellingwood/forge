@@ -18,9 +18,11 @@ import (
 	"github.com/aellingwood/forge/internal/config"
 	"github.com/aellingwood/forge/internal/content"
 	"github.com/aellingwood/forge/internal/feed"
+	"github.com/aellingwood/forge/internal/image"
 	"github.com/aellingwood/forge/internal/search"
 	"github.com/aellingwood/forge/internal/seo"
 	tmpl "github.com/aellingwood/forge/internal/template"
+	"github.com/yuin/goldmark"
 )
 
 // BuildOptions controls the behaviour of the build pipeline.
@@ -148,8 +150,53 @@ func (b *Builder) Build() (*BuildResult, error) {
 		})
 	}
 
+	// Determine theme path early — needed for image processing and template engine.
+	themeName := b.config.Theme
+	if themeName == "" {
+		themeName = "default"
+	}
+	themePath := filepath.Join(projectRoot, "themes", themeName)
+	themeStaticDir := filepath.Join(themePath, "static")
+	siteStaticDir := filepath.Join(projectRoot, "static")
+
+	// Step 3b: Process images (responsive variants) if enabled.
+	var imgProcessor *image.Processor
+	if b.config.Images.Enabled {
+		imgProcessor = image.NewProcessor(b.config.Images, projectRoot)
+
+		// Process images from theme static directory.
+		if info, err := os.Stat(themeStaticDir); err == nil && info.IsDir() {
+			if err := imgProcessor.ProcessDir(themeStaticDir, outputDir, ""); err != nil {
+				return nil, fmt.Errorf("processing theme static images: %w", err)
+			}
+		}
+
+		// Process images from site static directory.
+		if info, err := os.Stat(siteStaticDir); err == nil && info.IsDir() {
+			if err := imgProcessor.ProcessDir(siteStaticDir, outputDir, ""); err != nil {
+				return nil, fmt.Errorf("processing site static images: %w", err)
+			}
+		}
+
+		// Process images from page bundle directories.
+		for _, p := range pages {
+			if !p.IsBundle || p.BundleDir == "" {
+				continue
+			}
+			bundleOutputDir := filepath.Join(outputDir, strings.TrimPrefix(p.URL, "/"))
+			urlPrefix := strings.TrimSuffix(p.URL, "/")
+			if err := imgProcessor.ProcessDir(p.BundleDir, bundleOutputDir, urlPrefix); err != nil {
+				return nil, fmt.Errorf("processing bundle images for %s: %w", p.URL, err)
+			}
+		}
+	}
+
 	// Step 4: Render markdown in parallel.
-	mdRenderer := content.NewMarkdownRenderer()
+	var mdExtensions []goldmark.Extender
+	if imgProcessor != nil {
+		mdExtensions = append(mdExtensions, image.NewResponsiveImageExtension(imgProcessor))
+	}
+	mdRenderer := content.NewMarkdownRenderer(mdExtensions...)
 	numWorkers := runtime.NumCPU()
 
 	err = renderParallel(pages, numWorkers, func(p *content.Page) error {
@@ -197,11 +244,6 @@ func (b *Builder) Build() (*BuildResult, error) {
 	setSectionNavigation(pages)
 
 	// Step 7: Create template engine.
-	themeName := b.config.Theme
-	if themeName == "" {
-		themeName = "default"
-	}
-	themePath := filepath.Join(projectRoot, "themes", themeName)
 	userLayoutPath := filepath.Join(projectRoot, "layouts")
 
 	engine, err := tmpl.NewEngine(themePath, userLayoutPath)
@@ -210,10 +252,10 @@ func (b *Builder) Build() (*BuildResult, error) {
 	}
 
 	// Build site context for templates.
-	siteCtx := b.buildSiteContext(pages, tags, categories, baseURL, dataFiles)
+	siteCtx := b.buildSiteContext(pages, tags, categories, baseURL, dataFiles, imgProcessor)
 
 	// Build page contexts for all pages.
-	pageContextMap := b.buildPageContexts(pages, siteCtx)
+	pageContextMap := b.buildPageContexts(pages, siteCtx, imgProcessor)
 
 	// Step 8 & 9: Render pages to HTML in parallel and collect results.
 	type renderResult struct {
@@ -285,9 +327,6 @@ func (b *Builder) Build() (*BuildResult, error) {
 	}
 
 	// Step 11: Copy static files from theme and site static directories.
-	themeStaticDir := filepath.Join(themePath, "static")
-	siteStaticDir := filepath.Join(projectRoot, "static")
-
 	if info, err := os.Stat(themeStaticDir); err == nil && info.IsDir() {
 		copied, err := copyDirCounting(themeStaticDir, outputDir)
 		if err != nil {
@@ -589,6 +628,7 @@ func (b *Builder) buildSiteContext(
 	categories map[string][]*content.Page,
 	baseURL string,
 	dataFiles map[string]any,
+	imgProc *image.Processor,
 ) *tmpl.SiteContext {
 	// Build menu items.
 	menuItems := make([]tmpl.MenuItemContext, len(b.config.Menu.Main))
@@ -606,7 +646,7 @@ func (b *Builder) buildSiteContext(
 	// Build page contexts for site.
 	sitePages := make([]*tmpl.PageContext, 0, len(pages))
 	for _, p := range pages {
-		pc := pageToContext(p, nil) // site will be set after
+		pc := pageToContext(p, nil, imgProc) // site will be set after
 		sitePages = append(sitePages, pc)
 		if p.Section != "" {
 			sections[p.Section] = append(sections[p.Section], pc)
@@ -619,7 +659,7 @@ func (b *Builder) buildSiteContext(
 		tagMap := make(map[string][]*tmpl.PageContext)
 		for term, tagPages := range tags {
 			for _, tp := range tagPages {
-				tagMap[term] = append(tagMap[term], pageToContext(tp, nil))
+				tagMap[term] = append(tagMap[term], pageToContext(tp, nil, imgProc))
 			}
 		}
 		taxonomies["tags"] = tagMap
@@ -628,7 +668,7 @@ func (b *Builder) buildSiteContext(
 		catMap := make(map[string][]*tmpl.PageContext)
 		for term, catPages := range categories {
 			for _, cp := range catPages {
-				catMap[term] = append(catMap[term], pageToContext(cp, nil))
+				catMap[term] = append(catMap[term], pageToContext(cp, nil, imgProc))
 			}
 		}
 		taxonomies["categories"] = catMap
@@ -663,10 +703,10 @@ func (b *Builder) buildSiteContext(
 }
 
 // buildPageContexts creates a map from Page to PageContext for all pages.
-func (b *Builder) buildPageContexts(pages []*content.Page, siteCtx *tmpl.SiteContext) map[*content.Page]*tmpl.PageContext {
+func (b *Builder) buildPageContexts(pages []*content.Page, siteCtx *tmpl.SiteContext, imgProc *image.Processor) map[*content.Page]*tmpl.PageContext {
 	m := make(map[*content.Page]*tmpl.PageContext, len(pages))
 	for _, p := range pages {
-		ctx := pageToContext(p, siteCtx)
+		ctx := pageToContext(p, siteCtx, imgProc)
 		m[p] = ctx
 	}
 
@@ -725,7 +765,8 @@ func hasHomePage(pages []*content.Page) bool {
 }
 
 // pageToContext converts a content.Page to a template.PageContext.
-func pageToContext(p *content.Page, siteCtx *tmpl.SiteContext) *tmpl.PageContext {
+// If imgProc is non-nil, responsive image fields are populated on the cover image.
+func pageToContext(p *content.Page, siteCtx *tmpl.SiteContext, imgProc *image.Processor) *tmpl.PageContext {
 	ctx := &tmpl.PageContext{
 		Title:           p.Title,
 		Description:     p.Description,
@@ -751,15 +792,26 @@ func pageToContext(p *content.Page, siteCtx *tmpl.SiteContext) *tmpl.PageContext
 	}
 
 	if p.Cover != nil {
-		image := p.Cover.Image
-		if image != "" && !strings.HasPrefix(image, "/") && !strings.HasPrefix(image, "http") {
-			image = strings.TrimSuffix(p.URL, "/") + "/" + image
+		coverURL := p.Cover.Image
+		if coverURL != "" && !strings.HasPrefix(coverURL, "/") && !strings.HasPrefix(coverURL, "http") {
+			coverURL = strings.TrimSuffix(p.URL, "/") + "/" + coverURL
 		}
-		ctx.Cover = &tmpl.CoverImage{
-			Image:   image,
+		cover := &tmpl.CoverImage{
+			Image:   coverURL,
 			Alt:     p.Cover.Alt,
 			Caption: p.Cover.Caption,
 		}
+		// Populate responsive fields if the image was processed.
+		if imgProc != nil {
+			if pi := imgProc.GetImage(coverURL); pi != nil {
+				cover.Width = pi.Width
+				cover.Height = pi.Height
+				cover.Srcset = image.BuildSrcset(pi, "")     // original format
+				cover.WebPSrcset = image.BuildSrcset(pi, "webp")
+				cover.Sizes = image.DefaultSizes
+			}
+		}
+		ctx.Cover = cover
 	}
 
 	return ctx
