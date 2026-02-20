@@ -119,6 +119,8 @@ type BuildConfig struct {
 
 // DeployConfig holds deployment target configuration.
 type DeployConfig struct {
+	Endpoint   string           `yaml:"endpoint"   mapstructure:"endpoint"`
+	Profile    string           `yaml:"profile"    mapstructure:"profile"`
 	S3         S3Config         `yaml:"s3"         mapstructure:"s3"`
 	CloudFront CloudFrontConfig `yaml:"cloudfront" mapstructure:"cloudfront"`
 }

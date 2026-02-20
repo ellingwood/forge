@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -32,6 +33,8 @@ var deployCmd = &cobra.Command{
 		deployCfg := deploy.DeployConfig{
 			Bucket:       cfg.Deploy.S3.Bucket,
 			Region:       cfg.Deploy.S3.Region,
+			Endpoint:     cfg.Deploy.Endpoint,
+			Profile:      cfg.Deploy.Profile,
 			Distribution: cfg.Deploy.CloudFront.DistributionID,
 			URLRewrite:   cfg.Deploy.CloudFront.URLRewrite,
 			DryRun:       dryRun,
@@ -55,20 +58,37 @@ var deployCmd = &cobra.Command{
 
 		// 4. Build AWS SDK clients.
 		ctx := context.Background()
-		awsCfg, err := awsconfig.LoadDefaultConfig(ctx,
+		awsOpts := []func(*awsconfig.LoadOptions) error{
 			awsconfig.WithRegion(deployCfg.Region),
-		)
+		}
+		if deployCfg.Profile != "" {
+			awsOpts = append(awsOpts, awsconfig.WithSharedConfigProfile(deployCfg.Profile))
+		}
+		awsCfg, err := awsconfig.LoadDefaultConfig(ctx, awsOpts...)
 		if err != nil {
 			return fmt.Errorf("loading AWS config: %w", err)
 		}
 
-		s3Client := deploy.NewAWSS3Client(s3.NewFromConfig(awsCfg), deployCfg.Bucket)
+		s3Opts := []func(*s3.Options){}
+		if deployCfg.Endpoint != "" {
+			s3Opts = append(s3Opts, func(o *s3.Options) {
+				o.BaseEndpoint = aws.String(deployCfg.Endpoint)
+				o.UsePathStyle = true
+			})
+		}
+		s3Client := deploy.NewAWSS3Client(s3.NewFromConfig(awsCfg, s3Opts...), deployCfg.Bucket)
 
 		var cfClient deploy.CloudFrontClient
 		var cfFuncClient deploy.CloudFrontFunctionClient
 
 		if deployCfg.Distribution != "" {
-			cfSDK := cloudfront.NewFromConfig(awsCfg)
+			cfOpts := []func(*cloudfront.Options){}
+			if deployCfg.Endpoint != "" {
+				cfOpts = append(cfOpts, func(o *cloudfront.Options) {
+					o.BaseEndpoint = aws.String(deployCfg.Endpoint)
+				})
+			}
+			cfSDK := cloudfront.NewFromConfig(awsCfg, cfOpts...)
 			cfClient = deploy.NewAWSCloudFrontClient(cfSDK)
 			if deployCfg.URLRewrite {
 				cfFuncClient = deploy.NewAWSCloudFrontFunctionClient(cfSDK)

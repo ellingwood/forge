@@ -37,6 +37,8 @@ const URLRewriteFunctionCode = `function handler(event) {
 type DeployConfig struct {
 	Bucket       string
 	Region       string
+	Endpoint     string // custom AWS endpoint URL (optional, for local emulators)
+	Profile      string // AWS shared config profile name (optional)
 	Distribution string // CloudFront distribution ID (optional)
 	URLRewrite   bool   // whether to manage a CloudFront URL rewrite function
 	DryRun       bool
