@@ -28,6 +28,8 @@ type SiteConfig struct {
 	Server      ServerConfig      `yaml:"server"      mapstructure:"server"`
 	Build       BuildConfig       `yaml:"build"       mapstructure:"build"`
 	Deploy      DeployConfig      `yaml:"deploy"      mapstructure:"deploy"`
+	Images      ImageConfig       `yaml:"images"      mapstructure:"images"`
+	Security    SecurityConfig    `yaml:"security"    mapstructure:"security"`
 	Params      map[string]any    `yaml:"params"      mapstructure:"params"`
 }
 
@@ -136,6 +138,38 @@ type CloudFrontConfig struct {
 	DistributionID  string   `yaml:"distributionId"  mapstructure:"distributionId"`
 	InvalidatePaths []string `yaml:"invalidatePaths" mapstructure:"invalidatePaths"`
 	URLRewrite      bool     `yaml:"urlRewrite"      mapstructure:"urlRewrite"`
+	SecurityHeaders bool     `yaml:"securityHeaders" mapstructure:"securityHeaders"`
+}
+
+// ImageConfig controls responsive image generation and format conversion.
+type ImageConfig struct {
+	Enabled bool     `yaml:"enabled" mapstructure:"enabled"`
+	Quality int      `yaml:"quality" mapstructure:"quality"`
+	Sizes   []int    `yaml:"sizes"   mapstructure:"sizes"`
+	Formats []string `yaml:"formats" mapstructure:"formats"`
+}
+
+// SecurityConfig controls security header generation.
+type SecurityConfig struct {
+	Enabled bool       `yaml:"enabled" mapstructure:"enabled"`
+	CSP     CSPConfig  `yaml:"csp"     mapstructure:"csp"`
+	HSTS    HSTSConfig `yaml:"hsts"    mapstructure:"hsts"`
+}
+
+// CSPConfig holds Content Security Policy directive sources.
+type CSPConfig struct {
+	ScriptSrc  []string `yaml:"scriptSrc"  mapstructure:"scriptSrc"`
+	StyleSrc   []string `yaml:"styleSrc"   mapstructure:"styleSrc"`
+	ImgSrc     []string `yaml:"imgSrc"     mapstructure:"imgSrc"`
+	ConnectSrc []string `yaml:"connectSrc" mapstructure:"connectSrc"`
+	FontSrc    []string `yaml:"fontSrc"    mapstructure:"fontSrc"`
+}
+
+// HSTSConfig holds HTTP Strict Transport Security settings.
+type HSTSConfig struct {
+	MaxAge            int  `yaml:"maxAge"            mapstructure:"maxAge"`
+	IncludeSubDomains bool `yaml:"includeSubDomains" mapstructure:"includeSubDomains"`
+	Preload           bool `yaml:"preload"           mapstructure:"preload"`
 }
 
 // Default returns a SiteConfig populated with sensible default values.
@@ -179,6 +213,19 @@ func Default() *SiteConfig {
 			LiveReload: true,
 		},
 		Build: BuildConfig{},
+		Images: ImageConfig{
+			Enabled: true,
+			Quality: 75,
+			Sizes:   []int{320, 640, 960, 1280, 1920},
+			Formats: []string{"webp", "original"},
+		},
+		Security: SecurityConfig{
+			Enabled: false,
+			HSTS: HSTSConfig{
+				MaxAge:            31536000,
+				IncludeSubDomains: true,
+			},
+		},
 		Params: map[string]any{},
 	}
 }
