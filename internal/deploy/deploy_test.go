@@ -87,6 +87,26 @@ func (m *mockCloudFrontFunctionClient) EnsureURLRewriteFunction(_ context.Contex
 	return m.arn, nil
 }
 
+// mockCloudFrontHeadersPolicyClient for testing
+type mockCloudFrontHeadersPolicyClient struct {
+	calls []struct {
+		distributionID string
+		cfg            ResponseHeadersConfig
+	}
+	err error
+}
+
+func (m *mockCloudFrontHeadersPolicyClient) EnsureResponseHeadersPolicy(_ context.Context, distributionID string, cfg ResponseHeadersConfig) error {
+	if m.err != nil {
+		return m.err
+	}
+	m.calls = append(m.calls, struct {
+		distributionID string
+		cfg            ResponseHeadersConfig
+	}{distributionID, cfg})
+	return nil
+}
+
 // createTempFile creates a file in the given directory with the given content.
 func createTempFile(t *testing.T, dir, name, content string) string {
 	t.Helper()
@@ -373,7 +393,7 @@ func TestDeploy_DryRun(t *testing.T) {
 		DryRun:       true,
 	}
 
-	result, err := Deploy(context.Background(), cfg, dir, s3, cf, nil)
+	result, err := Deploy(context.Background(), cfg, dir, s3, cf, nil, nil)
 	if err != nil {
 		t.Fatalf("Deploy failed: %v", err)
 	}
@@ -420,7 +440,7 @@ func TestDeploy_UploadAndDelete(t *testing.T) {
 		Region: "us-east-1",
 	}
 
-	result, err := Deploy(context.Background(), cfg, dir, s3, cf, nil)
+	result, err := Deploy(context.Background(), cfg, dir, s3, cf, nil, nil)
 	if err != nil {
 		t.Fatalf("Deploy failed: %v", err)
 	}
@@ -470,7 +490,7 @@ func TestDeploy_WithCloudFront(t *testing.T) {
 		Distribution: "E1234567890",
 	}
 
-	result, err := Deploy(context.Background(), cfg, dir, s3, cf, nil)
+	result, err := Deploy(context.Background(), cfg, dir, s3, cf, nil, nil)
 	if err != nil {
 		t.Fatalf("Deploy failed: %v", err)
 	}
@@ -507,7 +527,7 @@ func TestDeploy_NoCloudFrontWithoutDistribution(t *testing.T) {
 		// Distribution is empty
 	}
 
-	_, err := Deploy(context.Background(), cfg, dir, s3, cf, nil)
+	_, err := Deploy(context.Background(), cfg, dir, s3, cf, nil, nil)
 	if err != nil {
 		t.Fatalf("Deploy failed: %v", err)
 	}
@@ -532,7 +552,7 @@ func TestDeploy_URLRewriteCalled(t *testing.T) {
 		URLRewrite:   true,
 	}
 
-	result, err := Deploy(context.Background(), cfg, dir, s3, cf, cfFunc)
+	result, err := Deploy(context.Background(), cfg, dir, s3, cf, cfFunc, nil)
 	if err != nil {
 		t.Fatalf("Deploy failed: %v", err)
 	}
@@ -570,7 +590,7 @@ func TestDeploy_URLRewriteSkippedNoDistribution(t *testing.T) {
 		// Distribution is empty
 	}
 
-	_, err := Deploy(context.Background(), cfg, dir, s3, cf, cfFunc)
+	_, err := Deploy(context.Background(), cfg, dir, s3, cf, cfFunc, nil)
 	if err != nil {
 		t.Fatalf("Deploy failed: %v", err)
 	}
@@ -595,7 +615,7 @@ func TestDeploy_URLRewriteSkippedWhenDisabled(t *testing.T) {
 		URLRewrite:   false,
 	}
 
-	_, err := Deploy(context.Background(), cfg, dir, s3, cf, cfFunc)
+	_, err := Deploy(context.Background(), cfg, dir, s3, cf, cfFunc, nil)
 	if err != nil {
 		t.Fatalf("Deploy failed: %v", err)
 	}
@@ -620,7 +640,7 @@ func TestDeploy_URLRewriteErrorNonFatal(t *testing.T) {
 		URLRewrite:   true,
 	}
 
-	result, err := Deploy(context.Background(), cfg, dir, s3, cf, cfFunc)
+	result, err := Deploy(context.Background(), cfg, dir, s3, cf, cfFunc, nil)
 	if err != nil {
 		t.Fatalf("Deploy should not return fatal error for URL rewrite failure: %v", err)
 	}
@@ -653,7 +673,7 @@ func TestDeploy_URLRewriteDryRun(t *testing.T) {
 		DryRun:       true,
 	}
 
-	_, err := Deploy(context.Background(), cfg, dir, s3, cf, cfFunc)
+	_, err := Deploy(context.Background(), cfg, dir, s3, cf, cfFunc, nil)
 	if err != nil {
 		t.Fatalf("Deploy failed: %v", err)
 	}
@@ -679,7 +699,7 @@ func TestDeploy_NilFunctionClientNoPanic(t *testing.T) {
 	}
 
 	// Should not panic with nil CloudFrontFunctionClient
-	_, err := Deploy(context.Background(), cfg, dir, s3, cf, nil)
+	_, err := Deploy(context.Background(), cfg, dir, s3, cf, nil, nil)
 	if err != nil {
 		t.Fatalf("Deploy failed: %v", err)
 	}
@@ -701,5 +721,106 @@ func TestScanFiles_NonExistentDir(t *testing.T) {
 	_, err := ScanFiles("/nonexistent/dir/that/does/not/exist")
 	if err == nil {
 		t.Error("expected error for non-existent directory")
+	}
+}
+
+func TestDeploy_SecurityHeadersCalled(t *testing.T) {
+	dir := t.TempDir()
+	createTempFile(t, dir, "index.html", "<html>test</html>")
+
+	s3 := &mockS3Client{objects: map[string]string{}}
+	cf := &mockCloudFrontClient{}
+	cfHeaders := &mockCloudFrontHeadersPolicyClient{}
+
+	headersCfg := ResponseHeadersConfig{
+		CSP:                 "default-src 'none'; script-src 'self'",
+		HSTSMaxAge:          31536000,
+		HSTSSubDomains:      true,
+		XContentTypeNosniff: true,
+		XFrameOptions:       "DENY",
+		ReferrerPolicy:      "strict-origin-when-cross-origin",
+	}
+
+	cfg := DeployConfig{
+		Bucket:             "test-bucket",
+		Region:             "us-east-1",
+		Distribution:       "E1234567890",
+		SecurityHeaders:    true,
+		SecurityHeadersCfg: headersCfg,
+	}
+
+	result, err := Deploy(context.Background(), cfg, dir, s3, cf, nil, cfHeaders)
+	if err != nil {
+		t.Fatalf("Deploy failed: %v", err)
+	}
+
+	if len(cfHeaders.calls) != 1 {
+		t.Fatalf("expected 1 security headers call, got %d", len(cfHeaders.calls))
+	}
+	call := cfHeaders.calls[0]
+	if call.distributionID != "E1234567890" {
+		t.Errorf("expected distribution E1234567890, got %s", call.distributionID)
+	}
+	if call.cfg.CSP != headersCfg.CSP {
+		t.Errorf("CSP mismatch: got %q, want %q", call.cfg.CSP, headersCfg.CSP)
+	}
+	if len(result.Errors) != 0 {
+		t.Errorf("expected no errors, got %v", result.Errors)
+	}
+}
+
+func TestDeploy_SecurityHeadersSkippedNoDistribution(t *testing.T) {
+	dir := t.TempDir()
+	createTempFile(t, dir, "index.html", "<html>test</html>")
+
+	s3 := &mockS3Client{objects: map[string]string{}}
+	cf := &mockCloudFrontClient{}
+	cfHeaders := &mockCloudFrontHeadersPolicyClient{}
+
+	cfg := DeployConfig{
+		Bucket:          "test-bucket",
+		Region:          "us-east-1",
+		SecurityHeaders: true,
+		// Distribution is empty
+	}
+
+	_, err := Deploy(context.Background(), cfg, dir, s3, cf, nil, cfHeaders)
+	if err != nil {
+		t.Fatalf("Deploy failed: %v", err)
+	}
+
+	if len(cfHeaders.calls) != 0 {
+		t.Errorf("expected no security headers calls without distribution, got %d", len(cfHeaders.calls))
+	}
+}
+
+func TestDeploy_SecurityHeadersErrorNonFatal(t *testing.T) {
+	dir := t.TempDir()
+	createTempFile(t, dir, "index.html", "<html>test</html>")
+
+	s3 := &mockS3Client{objects: map[string]string{}}
+	cf := &mockCloudFrontClient{}
+	cfHeaders := &mockCloudFrontHeadersPolicyClient{err: fmt.Errorf("access denied")}
+
+	cfg := DeployConfig{
+		Bucket:          "test-bucket",
+		Region:          "us-east-1",
+		Distribution:    "E1234567890",
+		SecurityHeaders: true,
+	}
+
+	result, err := Deploy(context.Background(), cfg, dir, s3, cf, nil, cfHeaders)
+	if err != nil {
+		t.Fatalf("Deploy should not return fatal error for security headers failure: %v", err)
+	}
+
+	found := false
+	for _, e := range result.Errors {
+		if e != nil {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected security headers error in result.Errors")
 	}
 }

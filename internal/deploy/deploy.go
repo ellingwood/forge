@@ -35,14 +35,16 @@ const URLRewriteFunctionCode = `function handler(event) {
 
 // DeployConfig holds deployment configuration.
 type DeployConfig struct {
-	Bucket       string
-	Region       string
-	Endpoint     string // custom AWS endpoint URL (optional, for local emulators)
-	Profile      string // AWS shared config profile name (optional)
-	Distribution string // CloudFront distribution ID (optional)
-	URLRewrite   bool   // whether to manage a CloudFront URL rewrite function
-	DryRun       bool
-	Verbose      bool
+	Bucket           string
+	Region           string
+	Endpoint         string                // custom AWS endpoint URL (optional, for local emulators)
+	Profile          string                // AWS shared config profile name (optional)
+	Distribution     string                // CloudFront distribution ID (optional)
+	URLRewrite       bool                  // whether to manage a CloudFront URL rewrite function
+	SecurityHeaders  bool                  // whether to manage a CloudFront response headers policy
+	SecurityHeadersCfg ResponseHeadersConfig // security header values (used when SecurityHeaders is true)
+	DryRun           bool
+	Verbose          bool
 }
 
 // DeployResult holds the results of a deployment.
@@ -80,6 +82,15 @@ type CloudFrontFunctionClient interface {
 	// distribution's default cache behavior as a viewer-request function.
 	// Returns the function ARN on success.
 	EnsureURLRewriteFunction(ctx context.Context, distributionID, functionName, functionCode string) (string, error)
+}
+
+// CloudFrontHeadersPolicyClient is an interface for managing CloudFront
+// response headers policies (security headers).
+type CloudFrontHeadersPolicyClient interface {
+	// EnsureResponseHeadersPolicy creates or updates a CloudFront response
+	// headers policy and associates it with the distribution's default cache
+	// behavior.
+	EnsureResponseHeadersPolicy(ctx context.Context, distributionID string, cfg ResponseHeadersConfig) error
 }
 
 // ContentTypeForExt returns the MIME type for a file extension.
@@ -261,10 +272,11 @@ func DiffFiles(local []FileEntry, remoteHashes map[string]string) (toUpload []Fi
 //  4. If DryRun, print plan and return
 //  5. Upload new/changed files
 //  6. Delete removed files
-//  7. If URLRewrite enabled, ensure CloudFront URL rewrite function
+//  7a. If URLRewrite enabled, ensure CloudFront URL rewrite function
+//  7b. If SecurityHeaders enabled, ensure CloudFront response headers policy
 //  8. If Distribution is set, invalidate CloudFront with "/*"
 //  9. Return results
-func Deploy(ctx context.Context, cfg DeployConfig, publicDir string, s3 S3Client, cf CloudFrontClient, cfFunc CloudFrontFunctionClient) (*DeployResult, error) {
+func Deploy(ctx context.Context, cfg DeployConfig, publicDir string, s3 S3Client, cf CloudFrontClient, cfFunc CloudFrontFunctionClient, cfHeaders CloudFrontHeadersPolicyClient) (*DeployResult, error) {
 	result := &DeployResult{}
 
 	// 1. Scan local files
@@ -295,6 +307,9 @@ func Deploy(ctx context.Context, cfg DeployConfig, publicDir string, s3 S3Client
 		}
 		if cfg.URLRewrite && cfg.Distribution != "" {
 			fmt.Println("[dry-run] ensure CloudFront URL rewrite function: forge-url-rewrite")
+		}
+		if cfg.SecurityHeaders && cfg.Distribution != "" {
+			fmt.Println("[dry-run] ensure CloudFront response headers policy: forge-security-headers")
 		}
 		if cfg.Distribution != "" {
 			fmt.Printf("[dry-run] invalidate CloudFront distribution: %s\n", cfg.Distribution)
@@ -337,7 +352,7 @@ func Deploy(ctx context.Context, cfg DeployConfig, publicDir string, s3 S3Client
 		}
 	}
 
-	// 7. Ensure CloudFront URL rewrite function if enabled
+	// 7a. Ensure CloudFront URL rewrite function if enabled
 	if cfg.URLRewrite && cfg.Distribution != "" && cfFunc != nil {
 		arn, err := cfFunc.EnsureURLRewriteFunction(ctx, cfg.Distribution,
 			"forge-url-rewrite", URLRewriteFunctionCode)
@@ -345,6 +360,15 @@ func Deploy(ctx context.Context, cfg DeployConfig, publicDir string, s3 S3Client
 			result.Errors = append(result.Errors, fmt.Errorf("CloudFront URL rewrite function: %w", err))
 		} else if cfg.Verbose {
 			fmt.Printf("ensured CloudFront URL rewrite function: %s\n", arn)
+		}
+	}
+
+	// 7b. Ensure CloudFront response headers policy if security headers enabled
+	if cfg.SecurityHeaders && cfg.Distribution != "" && cfHeaders != nil {
+		if err := cfHeaders.EnsureResponseHeadersPolicy(ctx, cfg.Distribution, cfg.SecurityHeadersCfg); err != nil {
+			result.Errors = append(result.Errors, fmt.Errorf("CloudFront response headers policy: %w", err))
+		} else if cfg.Verbose {
+			fmt.Printf("ensured CloudFront response headers policy: forge-security-headers\n")
 		}
 	}
 
