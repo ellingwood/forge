@@ -19,7 +19,7 @@ import (
 
 func TestInjectLiveReload_BeforeBody(t *testing.T) {
 	html := []byte("<html><body><p>Hello</p></body></html>")
-	result := InjectLiveReload(html, 1313)
+	result := InjectLiveReload(html, 1313, "testnonce")
 
 	if !bytes.Contains(result, []byte("ws://")) {
 		t.Error("expected WebSocket script to be injected")
@@ -30,9 +30,9 @@ func TestInjectLiveReload_BeforeBody(t *testing.T) {
 
 	// Script should appear before </body>.
 	bodyIdx := bytes.Index(result, []byte("</body>"))
-	scriptIdx := bytes.Index(result, []byte("<script>"))
+	scriptIdx := bytes.Index(result, []byte("<script nonce="))
 	if scriptIdx == -1 || bodyIdx == -1 {
-		t.Fatal("expected both <script> and </body> in result")
+		t.Fatal("expected both <script nonce=...> and </body> in result")
 	}
 	if scriptIdx >= bodyIdx {
 		t.Error("expected script to be injected before </body>")
@@ -41,7 +41,7 @@ func TestInjectLiveReload_BeforeBody(t *testing.T) {
 
 func TestInjectLiveReload_MissingBody(t *testing.T) {
 	html := []byte("<html><p>No body tag</p></html>")
-	result := InjectLiveReload(html, 8080)
+	result := InjectLiveReload(html, 8080, "testnonce")
 
 	if !bytes.Contains(result, []byte("ws://")) {
 		t.Error("expected WebSocket script to be appended")
@@ -57,17 +57,73 @@ func TestInjectLiveReload_MissingBody(t *testing.T) {
 }
 
 func TestInjectLiveReload_EmptyHTML(t *testing.T) {
-	result := InjectLiveReload([]byte{}, 1313)
-	if !bytes.Contains(result, []byte("<script>")) {
+	result := InjectLiveReload([]byte{}, 1313, "testnonce")
+	if !bytes.Contains(result, []byte("<script nonce=")) {
 		t.Error("expected script to be added even to empty HTML")
 	}
 }
 
 func TestInjectLiveReload_CustomPort(t *testing.T) {
 	html := []byte("<html><body></body></html>")
-	result := InjectLiveReload(html, 9999)
+	result := InjectLiveReload(html, 9999, "testnonce")
 	if !bytes.Contains(result, []byte(":9999/__forge/ws")) {
 		t.Error("expected custom port 9999 in WebSocket URL")
+	}
+}
+
+// ---------- InjectScriptNonces Tests ----------
+
+func TestInjectScriptNonces_InlineScript(t *testing.T) {
+	html := []byte(`<html><head></head><body><script>alert("hi")</script></body></html>`)
+	result := InjectScriptNonces(html, "abc123")
+	if !bytes.Contains(result, []byte(`<script nonce="abc123">`)) {
+		t.Errorf("expected nonce in inline script, got: %s", result)
+	}
+}
+
+func TestInjectScriptNonces_SkipsSrcScripts(t *testing.T) {
+	html := []byte(`<script src="/js/app.js"></script>`)
+	result := InjectScriptNonces(html, "abc123")
+	if bytes.Contains(result, []byte("nonce=")) {
+		t.Errorf("should not add nonce to script with src=, got: %s", result)
+	}
+}
+
+func TestInjectScriptNonces_SkipsExistingNonce(t *testing.T) {
+	html := []byte(`<script nonce="existing">code()</script>`)
+	result := InjectScriptNonces(html, "abc123")
+	// Should not add a second nonce.
+	if bytes.Contains(result, []byte(`nonce="abc123"`)) {
+		t.Errorf("should not add second nonce, got: %s", result)
+	}
+	// Original nonce should be preserved.
+	if !bytes.Contains(result, []byte(`nonce="existing"`)) {
+		t.Errorf("original nonce should be preserved, got: %s", result)
+	}
+}
+
+func TestInjectScriptNonces_MultipleScripts(t *testing.T) {
+	html := []byte(`<script>inline()</script><script src="/ext.js"></script><script>another()</script>`)
+	result := InjectScriptNonces(html, "xyz")
+	expected := `<script nonce="xyz">inline()</script><script src="/ext.js"></script><script nonce="xyz">another()</script>`
+	if string(result) != expected {
+		t.Errorf("unexpected result:\ngot:  %s\nwant: %s", result, expected)
+	}
+}
+
+func TestInjectScriptNonces_NoScripts(t *testing.T) {
+	html := []byte(`<html><body><p>Hello</p></body></html>`)
+	result := InjectScriptNonces(html, "abc")
+	if string(result) != string(html) {
+		t.Error("should not modify HTML without script tags")
+	}
+}
+
+func TestInjectScriptNonces_CaseInsensitive(t *testing.T) {
+	html := []byte(`<SCRIPT>code()</SCRIPT>`)
+	result := InjectScriptNonces(html, "nonce1")
+	if !bytes.Contains(result, []byte(`nonce="nonce1"`)) {
+		t.Errorf("should handle uppercase SCRIPT tags, got: %s", result)
 	}
 }
 
@@ -277,6 +333,84 @@ func TestHandleRequest_DirectoryTraversal(t *testing.T) {
 	// Should not serve files outside outputDir.
 	if rr.Code == http.StatusOK && bytes.Contains(rr.Body.Bytes(), []byte("root:")) {
 		t.Error("should not serve files outside the output directory")
+	}
+}
+
+// ---------- Security Header Tests ----------
+
+func TestHandleRequest_SecurityHeaders(t *testing.T) {
+	outputDir := t.TempDir()
+	writeTestFile(t, outputDir, "index.html", "<html><body><h1>Hi</h1></body></html>")
+
+	srv := NewServer(config.Default(), ServeOptions{
+		Port:         1313,
+		Bind:         "localhost",
+		OutputDir:    outputDir,
+		NoLiveReload: true,
+	})
+
+	req := httptest.NewRequest("GET", "/", nil)
+	rr := httptest.NewRecorder()
+	srv.handleRequest(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rr.Code)
+	}
+
+	// Check Content-Security-Policy header is present and contains key directives.
+	csp := rr.Header().Get("Content-Security-Policy")
+	if csp == "" {
+		t.Error("expected Content-Security-Policy header")
+	}
+	if !bytes.Contains([]byte(csp), []byte("default-src")) {
+		t.Error("expected default-src in CSP")
+	}
+	if !bytes.Contains([]byte(csp), []byte("script-src")) {
+		t.Error("expected script-src in CSP")
+	}
+	if !bytes.Contains([]byte(csp), []byte("nonce-")) {
+		t.Error("expected nonce in CSP script-src")
+	}
+
+	// Check other security headers.
+	if rr.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Error("expected X-Content-Type-Options: nosniff")
+	}
+	if rr.Header().Get("X-Frame-Options") != "DENY" {
+		t.Error("expected X-Frame-Options: DENY")
+	}
+	if rr.Header().Get("Referrer-Policy") != "strict-origin-when-cross-origin" {
+		t.Error("expected Referrer-Policy header")
+	}
+	if rr.Header().Get("Permissions-Policy") == "" {
+		t.Error("expected Permissions-Policy header")
+	}
+}
+
+func TestHandleRequest_UniqueNoncePerRequest(t *testing.T) {
+	outputDir := t.TempDir()
+	writeTestFile(t, outputDir, "index.html", "<html><body><h1>Hi</h1></body></html>")
+
+	srv := NewServer(config.Default(), ServeOptions{
+		Port:         1313,
+		Bind:         "localhost",
+		OutputDir:    outputDir,
+		NoLiveReload: false,
+	})
+
+	req1 := httptest.NewRequest("GET", "/", nil)
+	rr1 := httptest.NewRecorder()
+	srv.handleRequest(rr1, req1)
+
+	req2 := httptest.NewRequest("GET", "/", nil)
+	rr2 := httptest.NewRecorder()
+	srv.handleRequest(rr2, req2)
+
+	csp1 := rr1.Header().Get("Content-Security-Policy")
+	csp2 := rr2.Header().Get("Content-Security-Policy")
+
+	if csp1 == csp2 {
+		t.Error("expected different nonces (and thus different CSP headers) for different requests")
 	}
 }
 

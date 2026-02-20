@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/aellingwood/forge/internal/config"
+	"github.com/aellingwood/forge/internal/security"
 )
 
 // ServeOptions contains the configurable settings for the development server.
@@ -144,15 +145,40 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		contentType = "application/octet-stream"
 	}
 
-	// Inject live reload script for HTML files.
-	if !s.options.NoLiveReload && isHTML(ext, contentType) {
-		data = InjectLiveReload(data, s.options.Port)
+	// Generate a per-request nonce for CSP.
+	nonce, err := security.GenerateNonce()
+	if err != nil {
+		log.Printf("failed to generate CSP nonce: %v", err)
 	}
 
+	// Inject live reload script and nonces for HTML files.
+	if isHTML(ext, contentType) {
+		if !s.options.NoLiveReload {
+			data = InjectLiveReload(data, s.options.Port, nonce)
+		}
+		data = InjectScriptNonces(data, nonce)
+	}
+
+	// Only set CSP and security headers for HTML responses.
+	if isHTML(ext, contentType) {
+		s.setSecurityHeaders(w, nonce)
+	}
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(data)
+}
+
+// setSecurityHeaders adds security-related HTTP headers to the response,
+// including the Content-Security-Policy derived from the dev policy.
+func (s *Server) setSecurityHeaders(w http.ResponseWriter, nonce string) {
+	policy := security.DevPolicy(nonce, s.options.Port)
+	w.Header().Set("Content-Security-Policy", policy.String())
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+	w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+	// No HSTS -- dev server runs over HTTP.
 }
 
 // resolveFilePath maps a URL path to an actual file in the output directory.
